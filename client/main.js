@@ -1,56 +1,42 @@
 const socket = io();
 let localStream, peerConnection, currentRoom;
-let myName = ""; // Lưu tên của người dùng này
+let myName = ""; 
 let drawing = false;
-let mode = 'pen'; // Chế độ mặc định: 'pen' hoặc 'text'
+let mode = 'pen'; 
+let isMicOn = true;
+let isCamOn = true;
 
-// 1. TẠO MÀU CỐ ĐỊNH CHO MÁY NÀY (Để không bị nhảy màu khi nhiều người cùng vẽ)
+// 1. TẠO MÀU CỐ ĐỊNH CHO MÁY NÀY
 const myColor = '#' + Math.floor(Math.random() * 16777215).toString(16);
 
-// --- QUẢN LÝ PHÒNG VÀ TÊN NGƯỜI DÙNG ---
-// Nút Tạo cuộc họp mới
+// --- QUẢN LÝ PHÒNG VÀ GIAO DIỆN ---
 document.getElementById('btnCreate').onclick = () => {
     const name = document.getElementById('userNameInput').value;
     if (!name) return alert("Vui lòng nhập tên của bạn trước!");
-    
     myName = name;
-    const id = Math.random().toString(36).substring(2, 8); // Tạo mã ngẫu nhiên
+    const id = Math.random().toString(36).substring(2, 8); 
     startSession(id);
 };
 
-// Nút Tham gia phòng có sẵn
 document.getElementById('btnJoin').onclick = () => {
     const name = document.getElementById('userNameInput').value;
     const id = document.getElementById('roomInput').value;
-    
     if (!name || !id) return alert("Vui lòng nhập đầy đủ Tên và Mã phòng!");
-    
     myName = name;
     startSession(id);
 };
 
-// Nút Copy mã phòng
 document.getElementById('btnCopy').onclick = () => {
     navigator.clipboard.writeText(currentRoom);
     alert("Đã copy mã phòng: " + currentRoom);
 };
 
-// Chuyển đổi công cụ Bảng trắng (Vẽ / Gõ chữ)
+// Chuyển đổi công cụ
 const btnPen = document.getElementById('btnPen');
 const btnText = document.getElementById('btnText');
-
 if (btnPen && btnText) {
-    btnPen.onclick = () => {
-        mode = 'pen';
-        btnPen.classList.add('active');
-        btnText.classList.remove('active');
-    };
-
-    btnText.onclick = () => {
-        mode = 'text';
-        btnText.classList.add('active');
-        btnPen.classList.remove('active');
-    };
+    btnPen.onclick = () => { mode = 'pen'; btnPen.classList.add('active'); btnText.classList.remove('active'); };
+    btnText.onclick = () => { mode = 'text'; btnText.classList.add('active'); btnPen.classList.remove('active'); };
 }
 
 async function startSession(id) {
@@ -60,24 +46,21 @@ async function startSession(id) {
     document.getElementById('roomDisplay').innerText = id;
     document.getElementById('localNameTag').innerText = `Bạn: ${myName}`;
 
-    // Gửi yêu cầu vào phòng kèm theo Tên người dùng lên Server 
     socket.emit('join-room', { roomID: id, userName: myName });
     
     initWhiteboard();
     await initWebRTC(); 
 }
 
-// --- LOGIC BẢNG TRẮNG ĐỒNG BỘ (TCP/WEB SOCKET) ---
+// --- LOGIC BẢNG TRẮNG (TCP/WEB SOCKET) ---
 function initWhiteboard() {
     const canvas = document.getElementById('whiteboard');
     const ctx = canvas.getContext('2d');
-    let lastX = 0;
-    let lastY = 0;
+    let lastX = 0, lastY = 0;
 
     canvas.width = canvas.offsetWidth;
     canvas.height = canvas.offsetHeight;
 
-    // Hàm vẽ nét
     const drawLine = (x, y, lX, lY, color) => {
         ctx.beginPath();
         ctx.strokeStyle = color;
@@ -89,7 +72,6 @@ function initWhiteboard() {
         ctx.closePath();
     };
 
-    // Hàm viết chữ
     const drawText = (text, x, y, color) => {
         ctx.fillStyle = color;
         ctx.font = "20px Arial";
@@ -105,11 +87,40 @@ function initWhiteboard() {
             drawing = true;
             [lastX, lastY] = [x, y];
         } else if (mode === 'text') {
-            const text = prompt("Nhập nội dung văn bản:");
-            if (text) {
-                drawText(text, x, y, myColor);
-                socket.emit('draw-text', { text, x, y, color: myColor });
-            }
+            // Xóa ô nhập cũ nếu đang gõ dở ở chỗ khác
+            const oldInput = document.querySelector('.temp-text-input');
+            if (oldInput) oldInput.blur();
+
+            // Tạo ô nhập liệu "Google Drive"
+            const input = document.createElement('input');
+            input.className = 'temp-text-input';
+            
+            // Đặt vị trí ô nhập đúng điểm click
+            input.style.left = e.clientX + 'px';
+            input.style.top = (e.clientY - 10) + 'px'; 
+            
+            document.body.appendChild(input);
+            
+            // Focus ngay lập tức để gõ luôn
+            setTimeout(() => input.focus(), 0);
+
+            const saveAndExit = () => {
+                const val = input.value.trim();
+                if (val) {
+                    drawText(val, x, y, myColor);
+                    socket.emit('draw-text', { text: val, x, y, color: myColor });
+                }
+                if (input.parentNode) input.remove();
+            };
+
+            // Ngăn chặn việc click vào ô input làm kích hoạt vẽ trên canvas
+            input.onmousedown = (ev) => ev.stopPropagation();
+
+            input.onkeydown = (ev) => {
+                if (ev.key === 'Enter') saveAndExit();
+                if (ev.key === 'Escape') input.remove();
+            };
+            input.onblur = saveAndExit;
         }
     };
 
@@ -118,7 +129,6 @@ function initWhiteboard() {
         const rect = canvas.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
-
         drawLine(x, y, lastX, lastY, myColor);
         socket.emit('draw-line', { x, y, lastX, lastY, color: myColor });
         [lastX, lastY] = [x, y];
@@ -126,10 +136,9 @@ function initWhiteboard() {
 
     canvas.onmouseup = () => drawing = false;
 
-    // Lắng nghe dữ liệu vẽ từ người khác
     socket.on('draw-line', (data) => drawLine(data.x, data.y, data.lastX, data.lastY, data.color));
     socket.on('draw-text', (data) => drawText(data.text, data.x, data.y, data.color));
-
+    
     document.getElementById('btnClear').onclick = () => {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         socket.emit('clear-board');
@@ -146,21 +155,23 @@ async function initWebRTC() {
         peerConnection = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
         localStream.getTracks().forEach(t => peerConnection.addTrack(t, localStream));
 
-        peerConnection.ontrack = (e) => document.getElementById('remoteVideo').srcObject = e.streams[0];
+        peerConnection.ontrack = (e) => {
+            document.getElementById('remoteVideo').srcObject = e.streams[0];
+        };
+
         peerConnection.onicecandidate = (e) => {
             if (e.candidate) socket.emit('signal', { candidate: e.candidate });
         };
 
-        // Lắng nghe khi có người mới vào phòng để cập nhật tên 
-        socket.on('user-joined', (data) => {
+        socket.on('user-joined', async (data) => {
             document.getElementById('remoteNameTag').innerText = data.userName;
+            const offer = await peerConnection.createOffer();
+            await peerConnection.setLocalDescription(offer);
+            socket.emit('signal', { offer: offer, fromName: myName });
         });
 
-        // Xử lý tín hiệu Signaling
         socket.on('signal', async (data) => {
-            if (data.fromName) {
-                document.getElementById('remoteNameTag').innerText = data.fromName;
-            }
+            if (data.fromName) document.getElementById('remoteNameTag').innerText = data.fromName;
 
             if (data.offer) {
                 await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
@@ -170,16 +181,37 @@ async function initWebRTC() {
             } else if (data.answer) {
                 await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
             } else if (data.candidate) {
-                await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+                if (peerConnection.remoteDescription) {
+                    try {
+                        await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+                    } catch(e) { console.warn("Candidate lỗi:", e); }
+                }
             }
         });
 
-        // Gửi Offer kèm theo tên mình để máy kia hiển thị 
-        const offer = await peerConnection.createOffer();
-        await peerConnection.setLocalDescription(offer);
-        socket.emit('signal', { offer: offer, fromName: myName });
+        // Bổ sung điều khiển Mic/Cam
+        setupMediaControls();
 
     } catch (e) {
-        console.log("Camera lỗi hoặc không được cấp quyền, hệ thống vẫn chạy bảng trắng.");
+        console.error("Lỗi Camera/Mic:", e);
+        alert("Không thể mở Camera. Bạn vẫn có thể dùng bảng trắng.");
     }
+}
+
+function setupMediaControls() {
+    document.getElementById('btnMic').onclick = () => {
+        isMicOn = !isMicOn;
+        localStream.getAudioTracks()[0].enabled = isMicOn;
+        document.getElementById('btnMic').classList.toggle('red', !isMicOn);
+        document.getElementById('btnMic').innerHTML = isMicOn ? 
+            '<i class="fa-solid fa-microphone"></i>' : '<i class="fa-solid fa-microphone-slash"></i>';
+    };
+
+    document.getElementById('btnCam').onclick = () => {
+        isCamOn = !isCamOn;
+        localStream.getVideoTracks()[0].enabled = isCamOn;
+        document.getElementById('btnCam').classList.toggle('red', !isCamOn);
+        document.getElementById('btnCam').innerHTML = isCamOn ? 
+            '<i class="fa-solid fa-video"></i>' : '<i class="fa-solid fa-video-slash"></i>';
+    };
 }

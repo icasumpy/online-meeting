@@ -3,26 +3,28 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>E4Life Meeting - P2P Video & Whiteboard</title>
+    <title>E4Life Meeting - P2P Video & Interactive Board</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
+
     <div id="home-screen" class="screen">
         <div class="home-content">
             <h1>E4Life Meeting</h1>
-            <p>Hệ thống họp trực tuyến thời gian thực với bảng trắng tương tác.</p>
+            <p>Hệ thống họp trực tuyến thời gian thực thế hệ mới.</p>
             
             <div class="home-actions">
-                <input type="text" id="userNameInput" placeholder="Nhập tên của bạn..." class="name-input">
-                <hr style="margin: 20px 0; border: 0; border-top: 1px solid #5f6368;">
+                <input type="text" id="userNameInput" placeholder="Nhập tên của bạn để bắt đầu..." class="name-input">
                 
                 <button id="btnCreate" class="btn-primary">
-                    <i class="fa-solid fa-video"></i> Cuộc họp mới
+                    <i class="fa-solid fa-plus-circle"></i> Bắt đầu cuộc họp mới
                 </button>
 
+                <div style="margin: 10px 0; color: #5f6368; font-size: 14px;">hoặc tham gia bằng mã</div>
+
                 <div class="join-input-group">
-                    <input type="text" id="roomInput" placeholder="Nhập mã phòng">
+                    <input type="text" id="roomInput" placeholder="Nhập mã phòng (ví dụ: abcxyz)">
                     <button id="btnJoin" class="btn-text">Tham gia</button>
                 </div>
             </div>
@@ -31,10 +33,11 @@
 
     <div id="meeting-screen" class="screen" style="display: none;">
         <div class="main-layout">
+            
             <div class="video-section">
                 <div class="remote-wrap">
                     <video id="remoteVideo" autoplay playsinline></video>
-                    <div class="user-label" id="remoteNameTag">Người tham gia</div>
+                    <div class="user-label" id="remoteNameTag">Đang đợi người tham gia...</div>
                 </div>
                 
                 <div class="local-wrap">
@@ -44,17 +47,19 @@
             </div>
 
             <div class="whiteboard-section">
-                <div class="board-header">BẢNG TRẮNG TƯƠNG TÁC</div>
+                <div class="board-header">
+                    <i class="fa-solid fa-chalkboard"></i> BẢNG TRẮNG TƯƠNG TÁC
+                </div>
                 
                 <div class="board-toolbar">
-                    <button id="btnPen" class="tool-btn active" title="Chế độ vẽ tay">
-                        <i class="fa-solid fa-pen"></i> Vẽ
+                    <button id="btnPen" class="tool-btn active" title="Bút vẽ (P)">
+                        <i class="fa-solid fa-pen-nib"></i>
                     </button>
-                    <button id="btnText" class="tool-btn" title="Chế độ gõ chữ">
-                        <i class="fa-solid fa-font"></i> Chữ
+                    <button id="btnText" class="tool-btn" title="Soạn thảo (T)">
+                        <i class="fa-solid fa-font"></i>
                     </button>
-                    <button id="btnClear" class="tool-btn danger" title="Xóa toàn bộ bảng">
-                        <i class="fa-solid fa-trash"></i> Xóa
+                    <button id="btnClear" class="tool-btn danger" title="Xóa tất cả">
+                        <i class="fa-solid fa-eraser"></i>
                     </button>
                 </div>
 
@@ -64,9 +69,9 @@
 
         <div class="bottom-bar">
             <div class="room-info">
-                Mã phòng: <strong id="roomDisplay">---</strong> 
+                <span>Mã phòng: <strong id="roomDisplay" style="color: var(--primary);">---</strong></span>
                 <button id="btnCopy" class="icon-btn" title="Sao chép mã phòng">
-                    <i class="fa-regular fa-copy"></i> Copy
+                    <i class="fa-regular fa-clone"></i>
                 </button>
             </div>
             
@@ -77,14 +82,25 @@
                 <button id="btnCam" class="circle-btn" title="Bật/Tắt Camera">
                     <i class="fa-solid fa-video"></i>
                 </button>
-                <button class="circle-btn red" onclick="location.reload()" title="Rời khỏi cuộc họp">
+                <button class="circle-btn red" onclick="location.reload()" title="Rời khỏi">
                     <i class="fa-solid fa-phone-slash"></i>
                 </button>
+            </div>
+
+            <div class="time-info" style="color: var(--text-sub); font-size: 14px;">
+                <span id="currentTime"></span>
             </div>
         </div>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script src="main.js"></script>
+    <script>
+        // Hiển thị giờ thực tế cho chuyên nghiệp
+        setInterval(() => {
+            const now = new Date();
+            document.getElementById('currentTime').innerText = now.getHours() + ":" + String(now.getMinutes()).padStart(2, '0');
+        }, 1000);
+    </script>
 </body>
 </html>
