@@ -5,38 +5,56 @@ const io = require('socket.io')(http);
 const path = require('path');
 
 // 1. CẤU HÌNH ĐƯỜNG DẪN TĨNH
-// Trỏ ra folder 'client' nằm cùng cấp với folder 'server'
 const clientPath = path.join(__dirname, '../client');
 app.use(express.static(clientPath));
 
-// Route mặc định trả về file index.html
+// Route mặc định
 app.get('/', (req, res) => {
     res.sendFile(path.join(clientPath, 'index.html'));
 });
 
-// 2. LOGIC SOCKET.IO
+// 2. LƯU TRỮ TẠM THÔNG TIN NGƯỜI DÙNG
+const users = new Map(); // Map<socketID, {userName, roomID}>
+
+// 3. LOGIC SOCKET.IO
 io.on('connection', (socket) => {
     console.log('🔗 Thiết bị kết nối:', socket.id);
 
     // --- A. QUẢN LÝ VÀO PHÒNG ---
-    socket.on('join-room', (data) => {
+    socket.on('join-room', async (data) => {
         const { roomID, userName, action } = data;
         
         // Kiểm tra phòng đã tồn tại chưa
         const roomExists = io.sockets.adapter.rooms.has(roomID);
 
-        // LOGIC KIỂM TRA:
-        // Nếu muốn 'join' (tham gia) mà phòng chưa có -> Báo lỗi
+        // Nếu muốn 'join' mà phòng chưa có -> Báo lỗi
         if (action === 'join' && !roomExists) {
             socket.emit('room-error', '❌ Mã phòng không tồn tại hoặc cuộc họp đã kết thúc!');
             return; 
         }
 
-        // Nếu hợp lệ (Tạo mới hoặc Tham gia đúng mã)
+        // Lưu thông tin người dùng
+        users.set(socket.id, { userName, roomID });
+        socket.userName = userName;
+        socket.roomID = roomID;
+
+        // Join room
         socket.join(roomID);
         
-        // Gửi thông báo thành công cho người gọi để họ chuyển màn hình
-        socket.emit('room-success', roomID);
+        // Lấy danh sách người hiện có trong phòng
+        const roomSockets = await io.in(roomID).fetchSockets();
+        const participants = roomSockets
+            .filter(s => s.id !== socket.id)
+            .map(s => ({
+                socketID: s.id,
+                userName: s.userName || 'Ẩn danh'
+            }));
+        
+        // Gửi thông báo thành công và danh sách hiện tại
+        socket.emit('room-success', { 
+            roomID, 
+            participants 
+        });
 
         console.log(`✅ User [${userName}] đã vào phòng: ${roomID} | Action: ${action}`);
 
@@ -48,63 +66,80 @@ io.on('connection', (socket) => {
     });
 
     // --- B. TÍN HIỆU VIDEO CALL (WebRTC) ---
-    // Chuyển tiếp các gói tin Offer, Answer, Candidate giữa các thiết bị
     socket.on('signal', (signalData) => {
-        // Lấy room của socket hiện tại
-        const rooms = Array.from(socket.rooms);
-        const roomID = rooms.find(r => r !== socket.id); // RoomID không phải là socket.id
-
-        if (roomID) {
-            socket.to(roomID).emit('signal', signalData);
-        }
+        const userInfo = users.get(socket.id);
+        if (!userInfo) return;
+        
+        const roomID = userInfo.roomID;
+        signalData.fromSocketID = socket.id;
+        signalData.fromName = socket.userName;
+        
+        socket.to(roomID).emit('signal', signalData);
     });
 
     // --- C. ĐỒNG BỘ BẢNG TRẮNG ---
-    // 1. Vẽ nét
     socket.on('draw-line', (drawData) => {
-        const rooms = Array.from(socket.rooms);
-        const roomID = rooms.find(r => r !== socket.id);
-        if (roomID) socket.to(roomID).emit('draw-line', drawData);
+        const userInfo = users.get(socket.id);
+        if (userInfo) {
+            socket.to(userInfo.roomID).emit('draw-line', drawData);
+        }
     });
 
-    // 2. Viết chữ
     socket.on('draw-text', (drawData) => {
-        const rooms = Array.from(socket.rooms);
-        const roomID = rooms.find(r => r !== socket.id);
-        if (roomID) socket.to(roomID).emit('draw-text', drawData);
+        const userInfo = users.get(socket.id);
+        if (userInfo) {
+            socket.to(userInfo.roomID).emit('draw-text', drawData);
+        }
     });
 
-    // 3. Xóa bảng
     socket.on('clear-board', () => {
-        const rooms = Array.from(socket.rooms);
-        const roomID = rooms.find(r => r !== socket.id);
-        if (roomID) socket.to(roomID).emit('clear-board');
+        const userInfo = users.get(socket.id);
+        if (userInfo) {
+            socket.to(userInfo.roomID).emit('clear-board');
+        }
     });
 
     // --- D. TÍNH NĂNG CHAT ---
     socket.on('chat-message', (data) => {
-        const { roomID, userName, text } = data;
-        // Gửi tin nhắn cho những người khác trong phòng
-        socket.to(roomID).emit('chat-message', {
-            userName: userName,
-            text: text
+        const userInfo = users.get(socket.id);
+        if (!userInfo) return;
+        
+        socket.to(userInfo.roomID).emit('chat-message', {
+            userName: userInfo.userName,
+            text: data.text
         });
     });
 
     // --- E. NGẮT KẾT NỐI ---
     socket.on('disconnect', () => {
-        console.log('❌ Một người dùng đã ngắt kết nối:', socket.id);
-        // Có thể thêm logic thông báo user đã rời phòng nếu cần
+        console.log('❌ Người dùng ngắt kết nối:', socket.id);
+        
+        const userInfo = users.get(socket.id);
+        if (userInfo) {
+            const { userName, roomID } = userInfo;
+            
+            // Thông báo cho người khác trong phòng
+            socket.to(roomID).emit('user-left', {
+                socketID: socket.id,
+                userName: userName
+            });
+            
+            // Xóa khỏi bộ nhớ
+            users.delete(socket.id);
+            
+            console.log(`👋 [${userName}] đã rời phòng ${roomID}`);
+        }
     });
 });
 
-// 3. KHỞI CHẠY SERVER
-const PORT = 3000;
+// 4. KHỞI CHẠY SERVER
+const PORT = process.env.PORT || 3000;
 http.listen(PORT, () => {
     console.log('==============================================');
     console.log(`🚀 SERVER E4LIFE ĐANG CHẠY TẠI: http://localhost:${PORT}`);
     console.log('   - Video Call P2P: Sẵn sàng');
     console.log('   - Bảng trắng: Sẵn sàng');
     console.log('   - Chat Realtime: Sẵn sàng');
+    console.log('   - Danh sách người tham gia: Sẵn sàng');
     console.log('==============================================');
 });

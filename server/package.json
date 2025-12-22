@@ -1,12 +1,19 @@
 {
-  "name": "server",
+  "name": "online-meeting",
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node index.js",
+    "dev": "nodemon index.js"
   },
-  "keywords": [],
+  "dependencies": {
+    "express": "^5.2.1",
+    "socket.io": "^4.8.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.9"
+  },
+  "keywords": ["webrtc", "video-call", "meeting"],
   "author": "",
-  "license": "ISC",
-  "description": ""
+  "license": "ISC"
 }

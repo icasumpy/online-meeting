@@ -11,6 +11,7 @@
     --primary: #8ab4f8;        /* Xanh Google Meet */
     --primary-hover: #aecbfa;
     --danger: #ff6b6b;         /* Đỏ cho nút tắt/rời */
+    --success: #34a853;        /* Xanh online */
     
     /* Màu chữ */
     --text-main: #e8eaed;
@@ -31,7 +32,7 @@ body {
     background-color: var(--bg-dark); 
     color: var(--text-main); 
     height: 100vh; 
-    overflow: hidden; /* Chặn cuộn trang */
+    overflow: hidden;
 }
 
 /* --- 2. HOME SCREEN (MÀN HÌNH CHỜ) --- */
@@ -52,6 +53,17 @@ body {
     box-shadow: 0 10px 40px rgba(0,0,0,0.5); 
     border: var(--glass-border); 
     text-align: center;
+}
+
+.logo-area {
+    margin-bottom: 20px;
+}
+
+.logo-area i {
+    font-size: 48px;
+    color: var(--primary);
+    margin-bottom: 10px;
+    display: block;
 }
 
 .home-content h1 { font-size: 28px; margin-bottom: 5px; color: var(--primary); }
@@ -84,7 +96,10 @@ body {
 .divider::before { left: 0; } .divider::after { right: 0; }
 
 .join-input-group { display: flex; gap: 10px; margin-top: 10px; }
-.btn-text { background: transparent; color: var(--primary); border: none; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.btn-text { 
+    background: transparent; color: var(--primary); border: none; 
+    font-weight: 600; cursor: pointer; white-space: nowrap; padding: 0 20px;
+}
 
 /* --- 3. MEETING SCREEN (LAYOUT CHÍNH) --- */
 .content-wrapper {
@@ -97,7 +112,7 @@ body {
 
 /* --- 4. VIDEO STAGE (BÊN TRÁI) --- */
 .video-stage {
-    flex: 1; /* Mặc định chiếm hết không gian */
+    flex: 1;
     background: var(--bg-video);
     position: relative;
     display: flex;
@@ -111,7 +126,7 @@ body {
 
 #remoteVideo {
     width: 100%; height: 100%;
-    object-fit: contain; /* Giữ tỷ lệ video không bị méo */
+    object-fit: contain;
 }
 
 .remote-label { 
@@ -140,14 +155,14 @@ body {
     font-size: 11px; background: rgba(0,0,0,0.6); padding: 2px 8px; border-radius: 4px;
 }
 
-/* Khi Video Stage bị thu nhỏ (Do mở Board) */
+/* Khi Video Stage bị thu nhỏ */
 .video-stage.shrunk .local-wrap {
-    width: 120px; height: 70px; /* Thu nhỏ local video */
+    width: 120px; height: 70px;
 }
 
-/* --- 5. SIDE PANELS (CHAT & BOARD - BÊN PHẢI) --- */
+/* --- 5. SIDE PANELS (CHAT & BOARD & PARTICIPANTS - BÊN PHẢI) --- */
 .side-panel {
-    width: 0; /* Ẩn mặc định */
+    width: 0;
     opacity: 0;
     background: var(--bg-panel);
     display: flex;
@@ -165,7 +180,7 @@ body {
     display: flex; align-items: center; justify-content: space-between;
     white-space: nowrap; color: var(--text-dark);
 }
-.panel-header h3 { font-size: 16px; font-weight: 600; }
+.panel-header h3 { font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
 .close-btn { background: none; border: none; font-size: 18px; color: #5f6368; cursor: pointer; }
 .close-btn:hover { color: var(--danger); }
 
@@ -180,10 +195,16 @@ body {
 /* Mở Board: Video thu nhỏ, Board chiếm phần lớn */
 .content-wrapper.board-active .video-stage { flex: 1; }
 .side-panel.board-panel.active {
-    flex: 2; /* Chiếm 2 phần so với 1 phần của video */
+    flex: 2;
     min-width: 320px;
     opacity: 1;
-    width: auto; /* Reset width cứng */
+    width: auto;
+}
+
+/* Mở Participants: Chiếm 300px */
+.side-panel.participants-panel.active {
+    width: 300px;
+    opacity: 1;
 }
 
 /* --- 6. NỘI DUNG CHAT --- */
@@ -200,7 +221,7 @@ body {
 }
 .message.system { 
     align-self: center; background: transparent; 
-    color: #888; font-size: 12px; margin: 10px 0;
+    color: #888; font-size: 12px; margin: 10px 0; font-style: italic;
 }
 .message.received { 
     align-self: flex-start; background: #f1f3f4; 
@@ -240,7 +261,90 @@ body {
 .tool-btn.active { background: #e8f0fe; color: #1a73e8; border-color: #1a73e8; }
 .tool-btn.danger:hover { background: #fce8e6; color: #d93025; border-color: #d93025; }
 
-/* --- 8. BOTTOM BAR (THANH ĐIỀU KHIỂN) --- */
+/* --- 8. DANH SÁCH NGƯỜI THAM GIA --- */
+.participants-list {
+    flex: 1;
+    padding: 15px;
+    overflow-y: auto;
+    background: #fff;
+}
+
+.participants-header {
+    padding-bottom: 15px;
+    border-bottom: 1px solid #eee;
+    margin-bottom: 15px;
+    color: var(--text-dark);
+}
+
+.participants-header h4 {
+    font-size: 16px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.participant-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    background: #f8f9fa;
+    transition: background 0.2s;
+}
+
+.participant-item:hover {
+    background: #e8f0fe;
+}
+
+.participant-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.participant-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: var(--primary);
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 14px;
+}
+
+.participant-info div {
+    display: flex;
+    flex-direction: column;
+}
+
+.participant-info strong {
+    font-size: 14px;
+    color: var(--text-dark);
+}
+
+.participant-info small {
+    font-size: 11px;
+    color: var(--text-muted);
+}
+
+.participant-status {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+}
+
+.participant-status.online {
+    background: var(--success);
+    box-shadow: 0 0 0 2px rgba(52, 168, 83, 0.2);
+}
+
+/* --- 9. BOTTOM BAR (THANH ĐIỀU KHIỂN) --- */
 .bottom-bar {
     height: var(--bottom-bar-height);
     background: #151515;
@@ -266,15 +370,15 @@ body {
     display: flex; align-items: center; justify-content: center;
 }
 .control-btn:hover { background: #4a4d51; transform: scale(1.1); }
-.control-btn.active-state { background: var(--primary); color: #202124; } /* Khi đang mở Chat/Board */
-.control-btn.red-state { background: var(--danger); } /* Khi tắt Mic/Cam */
+.control-btn.active-state { background: var(--primary); color: #202124; }
+.control-btn.red-state { background: var(--danger); }
 
 .hangup-btn { background: #ea4335; width: 60px; border-radius: 30px; }
 .hangup-btn:hover { background: #d93025; }
 
-.right-placeholder { width: 100px; } /* Cân bằng layout */
+.right-placeholder { width: 100px; }
 
-/* --- 9. NOTIFICATION DOT (CHẤM ĐỎ) --- */
+/* --- 10. NOTIFICATION DOT (CHẤM ĐỎ) --- */
 .dot {
     position: absolute;
     top: 0px; right: 0px;
@@ -291,23 +395,24 @@ body {
     100% { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(255, 107, 107, 0); }
 }
 
-/* --- 10. RESPONSIVE (MOBILE) --- */
+/* --- 11. RESPONSIVE (MOBILE) --- */
 @media (max-width: 768px) {
     .content-wrapper { flex-direction: column; }
     
     .video-stage { flex: 1; width: 100%; height: auto; }
     .side-panel { width: 100% !important; height: 0; border-left: none; border-top: 1px solid #333; }
     
-    /* Khi mở panel trên mobile: Video ẩn đi hoặc thu nhỏ cực đại */
+    /* Khi mở panel trên mobile */
     .side-panel.chat-panel.active, 
-    .side-panel.board-panel.active { 
-        height: 60%; /* Chiếm 60% màn hình dưới */
+    .side-panel.board-panel.active,
+    .side-panel.participants-panel.active { 
+        height: 60%;
         flex: none; 
     }
     .video-stage.shrunk { height: 40%; }
     
     .local-wrap { width: 90px; height: 60px; bottom: 10px; right: 10px; }
     .bottom-bar { padding: 0 10px; }
-    .left-info, .right-placeholder { display: none; } /* Ẩn thông tin thừa */
+    .left-info, .right-placeholder { display: none; }
     .center-controls { width: 100%; justify-content: space-around; }
 }

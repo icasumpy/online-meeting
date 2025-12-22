@@ -41,7 +41,7 @@
             <div id="video-stage" class="video-stage">
                 <div class="video-container">
                     <video id="remoteVideo" autoplay playsinline></video>
-                    <div class="user-label remote-label" id="remoteNameTag">Đang đợi...</div>
+                    <div class="user-label remote-label" id="remoteNameTag">Đang đợi người tham gia...</div>
                 </div>
 
                 <div class="local-wrap">
@@ -50,6 +50,7 @@
                 </div>
             </div>
 
+            <!-- Bảng trắng -->
             <div id="board-panel" class="side-panel board-panel">
                 <div class="panel-header">
                     <h3><i class="fa-solid fa-chalkboard"></i> Bảng trắng</h3>
@@ -65,9 +66,10 @@
                 </div>
             </div>
 
+            <!-- Chat -->
             <div id="chat-panel" class="side-panel chat-panel">
                 <div class="panel-header">
-                    <h3>Tin nhắn</h3>
+                    <h3><i class="fa-solid fa-message"></i> Tin nhắn</h3>
                     <button class="close-btn" id="btnCloseChat"><i class="fa-solid fa-xmark"></i></button>
                 </div>
                 <div id="chat-messages" class="chat-messages">
@@ -76,6 +78,17 @@
                 <div class="chat-input-area">
                     <input type="text" id="chatInput" placeholder="Nhập tin nhắn..." autocomplete="off">
                     <button id="btnSend"><i class="fa-solid fa-paper-plane"></i></button>
+                </div>
+            </div>
+
+            <!-- Danh sách người tham gia -->
+            <div id="participants-panel" class="side-panel participants-panel">
+                <div class="panel-header">
+                    <h3><i class="fa-solid fa-users"></i> Người tham gia</h3>
+                    <button class="close-btn" id="btnCloseParticipants"><i class="fa-solid fa-xmark"></i></button>
+                </div>
+                <div class="participants-list" id="participantsList">
+                    <!-- Danh sách sẽ được thêm bằng JS -->
                 </div>
             </div>
 
@@ -100,8 +113,14 @@
                     <i class="fa-solid fa-message"></i>
                     <span id="chatNotification" class="dot" style="display: none;"></span>
                 </button>
+                
+                <button id="btnToggleParticipants" class="control-btn">
+                    <i class="fa-solid fa-users"></i>
+                </button>
 
-                <button class="control-btn hangup-btn" onclick="location.reload()"><i class="fa-solid fa-phone-slash"></i></button>
+                <button class="control-btn hangup-btn" onclick="location.reload()">
+                    <i class="fa-solid fa-phone-slash"></i>
+                </button>
             </div>
             
             <div class="right-placeholder"></div>
