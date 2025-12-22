@@ -9,6 +9,9 @@ let isMicOn = true;
 let isCamOn = true;
 const myColor = '#' + Math.floor(Math.random() * 16777215).toString(16);
 let participants = new Map(); // Map<socketID, {name, isLocal, joinTime}>
+let canvas, ctx;
+let currentRecipient = null; // Người nhận tin nhắn riêng
+let fileInput = null;
 
 // --- DOM ELEMENTS ---
 const contentWrapper = document.getElementById('content-wrapper');
@@ -21,6 +24,9 @@ const participantsPanel = document.getElementById('participants-panel');
 const btnToggleParticipants = document.getElementById('btnToggleParticipants');
 const notificationDot = document.getElementById('chatNotification');
 const participantsList = document.getElementById('participantsList');
+const btnSend = document.getElementById('btnSend');
+const chatInput = document.getElementById('chatInput');
+const messagesList = document.getElementById('chat-messages');
 
 // --- QUẢN LÝ PHÒNG ---
 document.getElementById('btnCreate').onclick = () => {
@@ -90,7 +96,13 @@ socket.on('room-success', (data) => {
     // 6. Khởi tạo Bảng trắng
     initWhiteboard();
     
-    // 7. Thông báo chat
+    // 7. Thêm nút Export bảng
+    addExportButton();
+    
+    // 8. Thêm input file cho chat
+    addFileUploadButton();
+    
+    // 9. Thông báo chat
     addMessageToUI("Hệ thống", `Bạn đã tham gia phòng ${roomID}`, 'system');
 });
 
@@ -168,6 +180,12 @@ socket.on('user-left', (data) => {
     // Xóa khỏi danh sách
     removeParticipantFromList(data.socketID);
     
+    // Nếu đang gửi tin nhắn riêng cho người này
+    if (currentRecipient === data.socketID) {
+        currentRecipient = null;
+        updateChatUI();
+    }
+    
     // Nếu là người đang call thì reset remote video
     if (participants.size === 1) { // Chỉ còn mình
         document.getElementById('remoteVideo').srcObject = null;
@@ -219,10 +237,16 @@ function updateParticipantsUI() {
     header.innerHTML = `<h4><i class="fa-solid fa-users"></i> Người tham gia (${participants.size})</h4>`;
     participantsList.appendChild(header);
     
-    // Thêm từng người
+    // Thêm từng người với nút nhắn riêng
     participants.forEach((participant, socketID) => {
         const div = document.createElement('div');
         div.className = 'participant-item';
+        
+        const messageBtn = participant.isLocal ? '' : 
+            `<button class="btn-private-message" data-socketid="${socketID}" title="Nhắn riêng">
+                <i class="fa-solid fa-message"></i>
+            </button>`;
+        
         div.innerHTML = `
             <div class="participant-info">
                 <span class="participant-avatar">${participant.name.charAt(0).toUpperCase()}</span>
@@ -231,9 +255,21 @@ function updateParticipantsUI() {
                     <small>${participant.isLocal ? '(Bạn)' : ''} • ${formatTime(participant.joinTime)}</small>
                 </div>
             </div>
-            ${!participant.isLocal ? `<div class="participant-status online"></div>` : ''}
+            <div class="participant-actions">
+                ${!participant.isLocal ? `<div class="participant-status online"></div>` : ''}
+                ${messageBtn}
+            </div>
         `;
+        
         participantsList.appendChild(div);
+        
+        // Thêm sự kiện cho nút nhắn riêng
+        if (!participant.isLocal) {
+            const btn = div.querySelector('.btn-private-message');
+            if (btn) {
+                btn.onclick = () => startPrivateChat(socketID, participant.name);
+            }
+        }
     });
 }
 
@@ -267,6 +303,7 @@ btnToggleChat.onclick = () => {
         chatPanel.classList.add('active');
         btnToggleChat.classList.add('active-state');
         notificationDot.style.display = 'none';
+        updateChatUI();
         setTimeout(() => document.getElementById('chatInput').focus(), 300);
     }
 };
@@ -301,9 +338,7 @@ btnToggleParticipants.onclick = () => {
 };
 document.getElementById('btnCloseParticipants').onclick = closeAllPanels;
 
-// --- LOGIC BẢNG TRẮNG ---
-let canvas, ctx;
-
+// --- LOGIC BẢNG TRẮNG & EXPORT ---
 function resizeCanvas() {
     if (!canvas) return;
     const container = document.querySelector('.canvas-container');
@@ -431,18 +466,165 @@ function createTextInput(screenX, screenY, canvasX, canvasY) {
     input.onblur = finish;
 }
 
-// --- CHAT ---
-const btnSend = document.getElementById('btnSend');
-const chatInput = document.getElementById('chatInput');
-const messagesList = document.getElementById('chat-messages');
+function addExportButton() {
+    const boardTools = document.querySelector('.board-tools');
+    if (!boardTools) return;
+    
+    const exportBtn = document.createElement('button');
+    exportBtn.className = 'tool-btn export-btn';
+    exportBtn.title = 'Xuất bảng trắng';
+    exportBtn.innerHTML = '<i class="fa-solid fa-download"></i>';
+    exportBtn.onclick = exportWhiteboard;
+    
+    boardTools.appendChild(exportBtn);
+}
+
+function exportWhiteboard() {
+    if (!canvas) return;
+    
+    // Tạo link download
+    const link = document.createElement('a');
+    link.download = `bảng-trắng-${currentRoom}-${Date.now()}.png`;
+    link.href = canvas.toDataURL('image/png');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    // Thông báo
+    addMessageToUI("Hệ thống", "Đã xuất bảng trắng thành ảnh PNG", 'system');
+}
+
+// --- CHAT NÂNG CAO ---
+function addFileUploadButton() {
+    const chatInputArea = document.querySelector('.chat-input-area');
+    if (!chatInputArea) return;
+    
+    // Tạo input file ẩn
+    fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.id = 'fileInput';
+    fileInput.style.display = 'none';
+    fileInput.accept = 'image/*,.pdf,.doc,.docx,.txt,.zip,.rar';
+    fileInput.multiple = false;
+    
+    // Nút upload file
+    const uploadBtn = document.createElement('button');
+    uploadBtn.id = 'btnUploadFile';
+    uploadBtn.title = 'Gửi file/hình ảnh';
+    uploadBtn.innerHTML = '<i class="fa-solid fa-paperclip"></i>';
+    uploadBtn.type = 'button';
+    
+    uploadBtn.onclick = () => fileInput.click();
+    
+    // Thêm vào chat input area
+    chatInputArea.insertBefore(uploadBtn, chatInputArea.querySelector('button'));
+    chatInputArea.insertBefore(fileInput, uploadBtn);
+    
+    // Xử lý khi chọn file
+    fileInput.onchange = handleFileUpload;
+}
+
+function handleFileUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSize) {
+        alert('File quá lớn! Tối đa 10MB');
+        fileInput.value = '';
+        return;
+    }
+    
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const base64Data = e.target.result;
+        
+        // Gửi file qua socket
+        socket.emit('chat-file', {
+            fileName: file.name,
+            fileType: file.type,
+            fileSize: file.size,
+            fileData: base64Data // Gửi cả data URL đầy đủ
+        });
+        
+        // Hiển thị ở UI với fileData
+        addFileMessageToUI("Bạn", file.name, file.type, file.size, true, base64Data);
+        
+        // Reset input
+        fileInput.value = '';
+    };
+    
+    reader.readAsDataURL(file);
+}
+
+function updateChatUI() {
+    const chatHeader = document.querySelector('.chat-panel .panel-header h3');
+    if (!chatHeader) return;
+    
+    if (currentRecipient) {
+        const recipient = participants.get(currentRecipient);
+        chatHeader.innerHTML = `<i class="fa-solid fa-message"></i> Tin nhắn riêng với ${recipient?.name || '...'}`;
+        chatHeader.style.color = '#8ab4f8';
+        
+        // Thêm nút quay lại chat nhóm
+        if (!document.getElementById('btnBackToGroup')) {
+            const backBtn = document.createElement('button');
+            backBtn.id = 'btnBackToGroup';
+            backBtn.className = 'back-btn';
+            backBtn.title = 'Quay lại chat nhóm';
+            backBtn.innerHTML = '<i class="fa-solid fa-arrow-left"></i>';
+            backBtn.onclick = () => {
+                currentRecipient = null;
+                updateChatUI();
+            };
+            
+            const panelHeader = document.querySelector('.chat-panel .panel-header');
+            panelHeader.insertBefore(backBtn, panelHeader.querySelector('.close-btn'));
+        }
+    } else {
+        chatHeader.innerHTML = `<i class="fa-solid fa-message"></i> Tin nhắn`;
+        chatHeader.style.color = '';
+        
+        // Xóa nút back nếu có
+        const backBtn = document.getElementById('btnBackToGroup');
+        if (backBtn) backBtn.remove();
+    }
+}
+
+function startPrivateChat(socketID, userName) {
+    currentRecipient = socketID;
+    updateChatUI();
+    
+    // Mở chat panel nếu chưa mở
+    if (!chatPanel.classList.contains('active')) {
+        closeAllPanels();
+        chatPanel.classList.add('active');
+        btnToggleChat.classList.add('active-state');
+        notificationDot.style.display = 'none';
+    }
+    
+    // Thông báo
+    addMessageToUI("Hệ thống", `Bắt đầu chat riêng với ${userName}`, 'system');
+}
 
 function sendMessage() {
     const text = chatInput.value.trim();
-    if (text) {
-        addMessageToUI("Bạn", text, 'sent');
+    if (!text) return;
+    
+    if (currentRecipient) {
+        // Gửi tin nhắn riêng
+        socket.emit('private-message', { 
+            toSocketID: currentRecipient, 
+            text 
+        });
+        addMessageToUI("Bạn (riêng)", text, 'private-sent');
+    } else {
+        // Gửi tin nhắn nhóm
         socket.emit('chat-message', { text });
-        chatInput.value = "";
+        addMessageToUI("Bạn", text, 'sent');
     }
+    
+    chatInput.value = "";
 }
 
 btnSend.onclick = sendMessage;
@@ -450,27 +632,171 @@ chatInput.onkeydown = (e) => {
     if (e.key === 'Enter') sendMessage(); 
 };
 
+// Nhận tin nhắn từ người khác
 socket.on('chat-message', (data) => {
-    addMessageToUI(data.userName, data.text, 'received');
+    if (data.type === 'file') {
+        addFileMessageToUI(
+            data.userName, 
+            data.fileName, 
+            data.fileType, 
+            data.fileSize, 
+            false, 
+            data.fileData // Thêm fileData vào
+        );
+    } else {
+        addMessageToUI(data.userName, data.text, 'received');
+    }
+    
     if (!chatPanel.classList.contains('active')) {
         notificationDot.style.display = 'block';
     }
+});
+
+// Nhận tin nhắn riêng
+socket.on('private-message', (data) => {
+    addMessageToUI(`${data.fromName} (riêng)`, data.text, 'private-received');
+    
+    if (!chatPanel.classList.contains('active')) {
+        notificationDot.style.display = 'block';
+    }
+});
+
+socket.on('private-message-sent', () => {
+    console.log("✅ Tin nhắn riêng đã gửi");
 });
 
 function addMessageToUI(sender, text, type) {
     const div = document.createElement('div');
     div.className = `message ${type}`;
     
-    if (type === 'received') {
-        const span = document.createElement('span');
-        span.className = 'sender-name';
-        span.innerText = sender;
-        div.appendChild(span);
+    const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    
+    if (type === 'received' || type === 'private-received') {
+        const senderSpan = document.createElement('span');
+        senderSpan.className = 'sender-name';
+        senderSpan.innerText = sender;
+        div.appendChild(senderSpan);
+        
+        const timeSpan = document.createElement('span');
+        timeSpan.className = 'message-time';
+        timeSpan.innerText = time;
+        timeSpan.style.fontSize = '10px';
+        timeSpan.style.marginLeft = '8px';
+        timeSpan.style.color = '#888';
+        senderSpan.appendChild(timeSpan);
     }
     
-    div.appendChild(document.createTextNode(text));
+    const textSpan = document.createElement('span');
+    textSpan.innerText = text;
+    div.appendChild(textSpan);
+    
+    if (type === 'sent' || type === 'private-sent') {
+        const timeSpan = document.createElement('span');
+        timeSpan.className = 'message-time';
+        timeSpan.innerText = time;
+        timeSpan.style.display = 'block';
+        timeSpan.style.fontSize = '10px';
+        timeSpan.style.color = '#888';
+        timeSpan.style.textAlign = 'right';
+        timeSpan.style.marginTop = '2px';
+        div.appendChild(timeSpan);
+    }
+    
     messagesList.appendChild(div);
     messagesList.scrollTop = messagesList.scrollHeight;
+}
+
+function addFileMessageToUI(sender, fileName, fileType, fileSize, isSent, fileData = null) {
+    const div = document.createElement('div');
+    div.className = `message ${isSent ? 'sent' : 'received'}`;
+    
+    const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    
+    if (!isSent) {
+        const senderSpan = document.createElement('span');
+        senderSpan.className = 'sender-name';
+        senderSpan.innerText = sender;
+        div.appendChild(senderSpan);
+    }
+    
+    const fileDiv = document.createElement('div');
+    fileDiv.className = 'file-message';
+    
+    // Biểu tượng file theo loại
+    let fileIcon = 'fa-file';
+    if (fileType.startsWith('image/')) fileIcon = 'fa-image';
+    else if (fileType.includes('pdf')) fileIcon = 'fa-file-pdf';
+    else if (fileType.includes('word')) fileIcon = 'fa-file-word';
+    else if (fileType.includes('zip') || fileType.includes('rar')) fileIcon = 'fa-file-archive';
+    else if (fileType.includes('text')) fileIcon = 'fa-file-text';
+    
+    fileDiv.innerHTML = `
+        <div class="file-icon">
+            <i class="fa-solid ${fileIcon}"></i>
+        </div>
+        <div class="file-info">
+            <div class="file-name">${fileName}</div>
+            <div class="file-size">${formatFileSize(fileSize)}</div>
+        </div>
+        <div class="file-download">
+            <i class="fa-solid fa-download"></i>
+        </div>
+    `;
+    
+    // Xử lý download file
+    fileDiv.onclick = (e) => {
+        e.stopPropagation();
+        
+        if (!fileData) {
+            alert("Không có dữ liệu file để tải xuống");
+            return;
+        }
+        
+        try {
+            // Sử dụng data URL trực tiếp
+            const link = document.createElement('a');
+            link.href = fileData;
+            link.download = fileName;
+            link.style.display = 'none';
+            
+            document.body.appendChild(link);
+            link.click();
+            
+            // Dọn dẹp
+            setTimeout(() => {
+                document.body.removeChild(link);
+            }, 100);
+            
+            console.log(`✅ Đã tải file: ${fileName}`);
+            
+        } catch (error) {
+            console.error("Lỗi khi tải file:", error);
+            alert("Lỗi khi tải file. Vui lòng thử lại!");
+        }
+    };
+    
+    div.appendChild(fileDiv);
+    
+    const timeSpan = document.createElement('span');
+    timeSpan.className = 'message-time';
+    timeSpan.innerText = time;
+    timeSpan.style.fontSize = '10px';
+    timeSpan.style.color = '#888';
+    timeSpan.style.marginTop = '4px';
+    timeSpan.style.display = 'block';
+    timeSpan.style.textAlign = isSent ? 'right' : 'left';
+    div.appendChild(timeSpan);
+    
+    messagesList.appendChild(div);
+    messagesList.scrollTop = messagesList.scrollHeight;
+}
+
+function formatFileSize(bytes) {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
 // --- CAMERA (WEBRTC) ---

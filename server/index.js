@@ -8,6 +8,10 @@ const path = require('path');
 const clientPath = path.join(__dirname, '../client');
 app.use(express.static(clientPath));
 
+// Tăng giới hạn kích thước file upload
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
 // Route mặc định
 app.get('/', (req, res) => {
     res.sendFile(path.join(clientPath, 'index.html'));
@@ -99,15 +103,63 @@ io.on('connection', (socket) => {
         }
     });
 
-    // --- D. TÍNH NĂNG CHAT ---
+    socket.on('request-board-snapshot', async ({ roomID, fromSocketID }) => {
+        // Gửi yêu cầu snapshot đến tất cả mọi người trong phòng
+        io.to(roomID).emit('request-board-snapshot', { fromSocketID });
+    });
+
+    socket.on('send-board-snapshot', ({ toSocketID, imageData }) => {
+        // Gửi snapshot bảng đến người yêu cầu
+        io.to(toSocketID).emit('receive-board-snapshot', { imageData });
+    });
+
+    // --- D. TÍNH NĂNG CHAT NÂNG CAO ---
     socket.on('chat-message', (data) => {
+        const userInfo = users.get(socket.id);
+        if (!userInfo) return;
+        
+        // Tin nhắn thông thường - gửi đến cả phòng
+        socket.to(userInfo.roomID).emit('chat-message', {
+            userName: userInfo.userName,
+            text: data.text,
+            type: 'text',
+            timestamp: new Date().toISOString(),
+            socketID: socket.id
+        });
+    });
+
+    // Tin nhắn file/hình ảnh
+    socket.on('chat-file', (data) => {
         const userInfo = users.get(socket.id);
         if (!userInfo) return;
         
         socket.to(userInfo.roomID).emit('chat-message', {
             userName: userInfo.userName,
-            text: data.text
+            fileName: data.fileName,
+            fileType: data.fileType,
+            fileSize: data.fileSize,
+            fileData: data.fileData, // Base64 encoded
+            type: 'file',
+            timestamp: new Date().toISOString(),
+            socketID: socket.id
         });
+    });
+
+    // Tin nhắn riêng
+    socket.on('private-message', ({ toSocketID, text }) => {
+        const userInfo = users.get(socket.id);
+        if (!userInfo) return;
+
+        // Gửi tin nhắn đến người nhận cụ thể
+        io.to(toSocketID).emit('private-message', {
+            fromSocketID: socket.id,
+            fromName: userInfo.userName,
+            text,
+            timestamp: new Date().toISOString()
+        });
+
+        // Gửi xác nhận cho người gửi
+        socket.emit('private-message-sent', { toSocketID });
     });
 
     // --- E. NGẮT KẾT NỐI ---
@@ -138,8 +190,8 @@ http.listen(PORT, () => {
     console.log('==============================================');
     console.log(`🚀 SERVER E4LIFE ĐANG CHẠY TẠI: http://localhost:${PORT}`);
     console.log('   - Video Call P2P: Sẵn sàng');
-    console.log('   - Bảng trắng: Sẵn sàng');
-    console.log('   - Chat Realtime: Sẵn sàng');
+    console.log('   - Bảng trắng: Sẵn sàng (có export)');
+    console.log('   - Chat Realtime: Sẵn sàng (file + tin nhắn riêng)');
     console.log('   - Danh sách người tham gia: Sẵn sàng');
     console.log('==============================================');
 });
