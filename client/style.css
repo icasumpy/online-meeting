@@ -1,17 +1,28 @@
-/* Google Fonts */
+/* --- 1. CẤU HÌNH CHUNG & BIẾN --- */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
 :root {
-    --bg-dark: #1a1c1e;
-    --bg-surface: #202124;
-    --primary: #8ab4f8; /* Xanh nhẹ kiểu Google */
-    --primary-dark: #1a73e8;
-    --danger: #f28b82;
-    --danger-dark: #ea4335;
+    /* Màu nền & chủ đạo */
+    --bg-dark: #121212;
+    --bg-video: #000000;
+    --bg-panel: #ffffff;
+    
+    /* Màu thương hiệu */
+    --primary: #8ab4f8;        /* Xanh Google Meet */
+    --primary-hover: #aecbfa;
+    --danger: #ff6b6b;         /* Đỏ cho nút tắt/rời */
+    
+    /* Màu chữ */
     --text-main: #e8eaed;
-    --text-sub: #bdc1c6;
-    --whiteboard-bg: #f8f9fa;
-    --shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+    --text-dark: #202124;
+    --text-muted: #9aa0a6;
+
+    /* Hiệu ứng kính (Glassmorphism) */
+    --glass-bg: rgba(32, 33, 36, 0.9);
+    --glass-border: 1px solid rgba(255, 255, 255, 0.1);
+    
+    /* Kích thước */
+    --bottom-bar-height: 80px;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Inter', sans-serif; }
@@ -20,263 +31,283 @@ body {
     background-color: var(--bg-dark); 
     color: var(--text-main); 
     height: 100vh; 
-    overflow: hidden; 
+    overflow: hidden; /* Chặn cuộn trang */
 }
 
-/* --- HOME SCREEN --- */
+/* --- 2. HOME SCREEN (MÀN HÌNH CHỜ) --- */
 #home-screen {
-    background: radial-gradient(circle at top right, #2d2e31, #1a1c1e);
+    display: flex; 
+    align-items: center; 
+    justify-content: center; 
+    height: 100%;
+    background: radial-gradient(circle at center, #2d2e32 0%, #121212 100%);
 }
 
 .home-content {
-    background: var(--bg-surface);
-    padding: 40px;
-    border-radius: 24px;
-    box-shadow: var(--shadow);
-    max-width: 450px;
-    width: 90%;
+    background: var(--glass-bg);
+    padding: 40px; 
+    border-radius: 24px; 
+    width: 90%; 
+    max-width: 420px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.5); 
+    border: var(--glass-border); 
     text-align: center;
 }
 
-.home-content h1 {
-    font-size: 32px;
-    font-weight: 700;
-    margin-bottom: 12px;
-    color: var(--primary);
-}
+.home-content h1 { font-size: 28px; margin-bottom: 5px; color: var(--primary); }
+.home-content p { color: var(--text-muted); margin-bottom: 30px; font-size: 14px; }
 
-.home-content p {
-    color: var(--text-sub);
-    margin-bottom: 30px;
-}
-
-.home-actions {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-}
-
-.name-input {
-    width: 100%;
-    background: #3c4043;
-    border: 2px solid transparent;
-    border-radius: 12px;
-    padding: 14px;
-    color: white;
-    font-size: 16px;
+.name-input, .join-input-group input {
+    width: 100%; padding: 14px; 
+    background: #2b2d31; 
+    border: 1px solid #444;
+    border-radius: 12px; 
+    color: white; 
+    outline: none; 
     transition: 0.3s;
 }
-
-.name-input:focus {
-    border-color: var(--primary);
-    outline: none;
-    background: #4a4d51;
-}
+.name-input:focus, .join-input-group input:focus { border-color: var(--primary); }
 
 .btn-primary {
-    background: var(--primary-dark);
-    color: white;
-    border: none;
-    padding: 14px;
-    border-radius: 12px;
-    cursor: pointer;
-    font-weight: 600;
-    font-size: 16px;
-    transition: 0.3s;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
+    width: 100%; padding: 14px; margin-top: 15px; 
+    background: var(--primary); color: #202124;
+    border: none; border-radius: 12px; 
+    font-weight: 600; cursor: pointer; transition: 0.3s;
+    font-size: 16px; display: flex; justify-content: center; gap: 8px;
 }
+.btn-primary:hover { background: var(--primary-hover); transform: translateY(-1px); }
 
-.btn-primary:hover {
-    background: #185abc;
-    transform: translateY(-2px);
+.divider { margin: 20px 0; color: #555; font-size: 12px; position: relative; }
+.divider::before, .divider::after {
+    content: ""; position: absolute; top: 50%; width: 40%; height: 1px; background: #444;
 }
+.divider::before { left: 0; } .divider::after { right: 0; }
 
-.join-input-group {
-    display: flex;
-    background: #3c4043;
-    border-radius: 12px;
-    padding: 4px;
-    margin-top: 10px;
-}
+.join-input-group { display: flex; gap: 10px; margin-top: 10px; }
+.btn-text { background: transparent; color: var(--primary); border: none; font-weight: 600; cursor: pointer; white-space: nowrap; }
 
-.join-input-group input {
-    background: transparent;
-    border: none;
-    color: white;
-    padding: 10px 15px;
-    flex: 1;
-    outline: none;
-}
-
-.btn-text {
-    background: transparent;
-    border: none;
-    color: var(--primary);
-    cursor: pointer;
-    font-weight: 600;
-    padding: 0 15px;
-}
-
-/* --- MEETING SCREEN --- */
-.main-layout {
+/* --- 3. MEETING SCREEN (LAYOUT CHÍNH) --- */
+.content-wrapper {
     display: flex;
     width: 100%;
-    height: calc(100vh - 90px);
-    padding: 15px;
-    gap: 15px;
-}
-
-.video-section {
-    flex: 1.5;
+    height: calc(100vh - var(--bottom-bar-height));
     position: relative;
-    background: #000;
-    border-radius: 16px;
-    overflow: hidden;
-    box-shadow: var(--shadow);
+    transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 
-.remote-wrap { width: 100%; height: 100%; background: #202124; }
-#remoteVideo { width: 100%; height: 100%; object-fit: cover; }
+/* --- 4. VIDEO STAGE (BÊN TRÁI) --- */
+.video-stage {
+    flex: 1; /* Mặc định chiếm hết không gian */
+    background: var(--bg-video);
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    transition: all 0.4s ease;
+}
 
+.video-container { width: 100%; height: 100%; position: relative; }
+
+#remoteVideo {
+    width: 100%; height: 100%;
+    object-fit: contain; /* Giữ tỷ lệ video không bị méo */
+}
+
+.remote-label { 
+    position: absolute; top: 20px; left: 20px; 
+    background: rgba(0,0,0,0.6); padding: 5px 12px; border-radius: 6px; 
+    color: white; font-size: 13px; backdrop-filter: blur(4px);
+}
+
+/* Local Video (PIP - Picture in Picture) */
 .local-wrap {
-    position: absolute;
-    bottom: 20px;
-    right: 20px;
-    width: 240px;
-    height: 140px;
-    border-radius: 12px;
+    position: absolute; 
+    bottom: 20px; right: 20px; 
+    width: 200px; height: 120px;
+    background: #202124; 
+    border-radius: 12px; 
     overflow: hidden;
     border: 2px solid rgba(255,255,255,0.2);
-    box-shadow: 0 8px 20px rgba(0,0,0,0.5);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.5);
     z-index: 10;
+    transition: all 0.3s ease;
 }
+
 #localVideo { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
-
-.user-label {
-    position: absolute;
-    bottom: 10px;
-    left: 10px;
-    background: rgba(0, 0, 0, 0.6);
-    padding: 4px 12px;
-    border-radius: 6px;
-    font-size: 13px;
-    backdrop-filter: blur(4px);
+.local-wrap .user-label {
+    position: absolute; bottom: 5px; left: 5px;
+    font-size: 11px; background: rgba(0,0,0,0.6); padding: 2px 8px; border-radius: 4px;
 }
 
-/* Whiteboard Section */
-.whiteboard-section {
-    flex: 1;
-    background: var(--whiteboard-bg);
-    color: #333;
-    border-radius: 16px;
+/* Khi Video Stage bị thu nhỏ (Do mở Board) */
+.video-stage.shrunk .local-wrap {
+    width: 120px; height: 70px; /* Thu nhỏ local video */
+}
+
+/* --- 5. SIDE PANELS (CHAT & BOARD - BÊN PHẢI) --- */
+.side-panel {
+    width: 0; /* Ẩn mặc định */
+    opacity: 0;
+    background: var(--bg-panel);
     display: flex;
     flex-direction: column;
+    border-left: 1px solid #333;
     overflow: hidden;
-    box-shadow: var(--shadow);
+    transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 
-.board-header {
-    padding: 15px;
-    font-weight: 700;
-    background: #fff;
-    border-bottom: 1px solid #ddd;
-    text-align: center;
-    color: #1a73e8;
-    letter-spacing: 1px;
+.panel-header {
+    height: 54px; min-height: 54px;
+    padding: 0 15px;
+    background: #f8f9fa;
+    border-bottom: 1px solid #e0e0e0;
+    display: flex; align-items: center; justify-content: space-between;
+    white-space: nowrap; color: var(--text-dark);
+}
+.panel-header h3 { font-size: 16px; font-weight: 600; }
+.close-btn { background: none; border: none; font-size: 18px; color: #5f6368; cursor: pointer; }
+.close-btn:hover { color: var(--danger); }
+
+/* --- TRẠNG THÁI MỞ (ACTIVE) --- */
+
+/* Mở Chat: Chiếm 340px cố định */
+.side-panel.chat-panel.active {
+    width: 340px;
+    opacity: 1;
 }
 
-.board-toolbar {
-    display: flex;
-    justify-content: center;
-    gap: 12px;
-    padding: 12px;
-    background: #f1f3f4;
-    border-bottom: 1px solid #ddd;
+/* Mở Board: Video thu nhỏ, Board chiếm phần lớn */
+.content-wrapper.board-active .video-stage { flex: 1; }
+.side-panel.board-panel.active {
+    flex: 2; /* Chiếm 2 phần so với 1 phần của video */
+    min-width: 320px;
+    opacity: 1;
+    width: auto; /* Reset width cứng */
 }
 
-.tool-btn {
-    width: 40px;
-    height: 40px;
-    border: 1px solid #ddd;
-    background: white;
-    border-radius: 8px;
-    cursor: pointer;
-    transition: 0.2s;
-    color: #5f6368;
-}
-
-.tool-btn:hover { background: #e8f0fe; color: var(--primary-dark); }
-.tool-btn.active { background: var(--primary-dark); color: white; border-color: var(--primary-dark); }
-.tool-btn.danger:hover { background: #fce8e6; color: var(--danger-dark); }
-
-#whiteboard { 
-    flex: 1; 
+/* --- 6. NỘI DUNG CHAT --- */
+.chat-messages {
+    flex: 1; padding: 15px; 
+    overflow-y: auto; 
     background: #fff; 
-    cursor: crosshair;
+    display: flex; flex-direction: column; gap: 10px;
 }
 
-/* Bottom Bar Controls */
+.message { 
+    max-width: 85%; padding: 8px 12px; 
+    border-radius: 12px; font-size: 14px; line-height: 1.4; color: #000;
+}
+.message.system { 
+    align-self: center; background: transparent; 
+    color: #888; font-size: 12px; margin: 10px 0;
+}
+.message.received { 
+    align-self: flex-start; background: #f1f3f4; 
+    border-bottom-left-radius: 2px;
+}
+.message.sent { 
+    align-self: flex-end; background: #e8f0fe; 
+    color: #1a73e8; border-bottom-right-radius: 2px;
+}
+.sender-name { display: block; font-size: 10px; font-weight: 700; color: #5f6368; margin-bottom: 2px; }
+
+.chat-input-area {
+    padding: 15px; background: #f8f9fa; 
+    border-top: 1px solid #ddd; display: flex; gap: 10px;
+}
+.chat-input-area input {
+    flex: 1; padding: 10px 15px; 
+    border: 1px solid #dadce0; border-radius: 20px; 
+    outline: none; transition: 0.2s;
+}
+.chat-input-area input:focus { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(26,115,232,0.2); }
+.chat-input-area button {
+    background: none; border: none; color: var(--primary); 
+    font-size: 18px; cursor: pointer;
+}
+
+/* --- 7. NỘI DUNG BOARD --- */
+.canvas-container { flex: 1; position: relative; background: #fff; cursor: crosshair; }
+#whiteboard { width: 100%; height: 100%; display: block; }
+
+.board-tools { display: flex; gap: 8px; }
+.tool-btn {
+    width: 32px; height: 32px; 
+    border: 1px solid #dadce0; background: white; border-radius: 6px;
+    cursor: pointer; color: #5f6368; display: flex; align-items: center; justify-content: center;
+}
+.tool-btn.active { background: #e8f0fe; color: #1a73e8; border-color: #1a73e8; }
+.tool-btn.danger:hover { background: #fce8e6; color: #d93025; border-color: #d93025; }
+
+/* --- 8. BOTTOM BAR (THANH ĐIỀU KHIỂN) --- */
 .bottom-bar {
-    height: 90px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 0 40px;
-    background: var(--bg-dark);
+    height: var(--bottom-bar-height);
+    background: #151515;
+    border-top: 1px solid #333;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 30px;
+    position: relative; z-index: 100;
 }
 
-.room-info {
-    font-size: 15px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    color: var(--text-sub);
+.left-info { color: #bdc1c6; font-size: 14px; display: flex; gap: 15px; }
+.room-badge strong { color: var(--primary); letter-spacing: 1px; margin: 0 5px; }
+.room-badge i { cursor: pointer; transition: 0.2s; }
+.room-badge i:hover { color: white; }
+
+.center-controls { display: flex; gap: 12px; }
+
+.control-btn {
+    width: 45px; height: 45px; 
+    border-radius: 50%; border: none; 
+    background: #3c4043; color: white; 
+    font-size: 18px; cursor: pointer; 
+    transition: 0.2s; position: relative;
+    display: flex; align-items: center; justify-content: center;
 }
+.control-btn:hover { background: #4a4d51; transform: scale(1.1); }
+.control-btn.active-state { background: var(--primary); color: #202124; } /* Khi đang mở Chat/Board */
+.control-btn.red-state { background: var(--danger); } /* Khi tắt Mic/Cam */
 
-.icon-btn {
-    background: transparent;
-    border: none;
-    color: var(--primary);
-    cursor: pointer;
-    font-size: 18px;
-    padding: 5px;
-}
+.hangup-btn { background: #ea4335; width: 60px; border-radius: 30px; }
+.hangup-btn:hover { background: #d93025; }
 
-.center-controls {
-    display: flex;
-    gap: 15px;
-}
+.right-placeholder { width: 100px; } /* Cân bằng layout */
 
-.circle-btn {
-    width: 52px;
-    height: 52px;
-    border-radius: 50%;
-    border: none;
-    background: #3c4043;
-    color: white;
-    cursor: pointer;
-    font-size: 20px;
-    transition: 0.3s;
-}
-
-.circle-btn:hover { background: #4a4d51; transform: scale(1.1); }
-.circle-btn.red { background: var(--danger-dark); }
-.circle-btn.red:hover { background: #c5221f; }
-.circle-btn.active-control { background: white; color: #3c4043; } /* For toggle state if needed */
-
-/* Text Input on Board */
-.temp-text-input {
+/* --- 9. NOTIFICATION DOT (CHẤM ĐỎ) --- */
+.dot {
     position: absolute;
-    z-index: 9999;
-    background: white;
-    border: 2px solid var(--primary-dark);
-    border-radius: 4px;
-    color: black;
-    font-size: 18px;
-    padding: 4px 8px;
-    outline: none;
-    box-shadow: var(--shadow);
+    top: 0px; right: 0px;
+    width: 12px; height: 12px;
+    background: var(--danger);
+    border-radius: 50%;
+    border: 2px solid #3c4043;
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0% { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(255, 107, 107, 0.7); }
+    70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(255, 107, 107, 0); }
+    100% { transform: scale(0.9); box-shadow: 0 0 0 0 rgba(255, 107, 107, 0); }
+}
+
+/* --- 10. RESPONSIVE (MOBILE) --- */
+@media (max-width: 768px) {
+    .content-wrapper { flex-direction: column; }
+    
+    .video-stage { flex: 1; width: 100%; height: auto; }
+    .side-panel { width: 100% !important; height: 0; border-left: none; border-top: 1px solid #333; }
+    
+    /* Khi mở panel trên mobile: Video ẩn đi hoặc thu nhỏ cực đại */
+    .side-panel.chat-panel.active, 
+    .side-panel.board-panel.active { 
+        height: 60%; /* Chiếm 60% màn hình dưới */
+        flex: none; 
+    }
+    .video-stage.shrunk { height: 40%; }
+    
+    .local-wrap { width: 90px; height: 60px; bottom: 10px; right: 10px; }
+    .bottom-bar { padding: 0 10px; }
+    .left-info, .right-placeholder { display: none; } /* Ẩn thông tin thừa */
+    .center-controls { width: 100%; justify-content: space-around; }
 }

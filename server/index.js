@@ -4,67 +4,107 @@ const http = require('http').Server(app);
 const io = require('socket.io')(http);
 const path = require('path');
 
-// 1. Cấu hình đường dẫn: Trỏ từ folder server ra ngoài folder client
+// 1. CẤU HÌNH ĐƯỜNG DẪN TĨNH
+// Trỏ ra folder 'client' nằm cùng cấp với folder 'server'
 const clientPath = path.join(__dirname, '../client');
 app.use(express.static(clientPath));
 
+// Route mặc định trả về file index.html
 app.get('/', (req, res) => {
     res.sendFile(path.join(clientPath, 'index.html'));
 });
 
-// 2. Logic kết nối Socket.io
+// 2. LOGIC SOCKET.IO
 io.on('connection', (socket) => {
-    console.log('Thiết bị mới kết nối:', socket.id);
+    console.log('🔗 Thiết bị kết nối:', socket.id);
 
-    // Xử lý khi người dùng tham gia vào phòng kèm theo Tên người dùng
+    // --- A. QUẢN LÝ VÀO PHÒNG ---
     socket.on('join-room', (data) => {
-        const { roomID, userName } = data; // Nhận mã phòng và tên từ client
+        const { roomID, userName, action } = data;
+        
+        // Kiểm tra phòng đã tồn tại chưa
+        const roomExists = io.sockets.adapter.rooms.has(roomID);
+
+        // LOGIC KIỂM TRA:
+        // Nếu muốn 'join' (tham gia) mà phòng chưa có -> Báo lỗi
+        if (action === 'join' && !roomExists) {
+            socket.emit('room-error', '❌ Mã phòng không tồn tại hoặc cuộc họp đã kết thúc!');
+            return; 
+        }
+
+        // Nếu hợp lệ (Tạo mới hoặc Tham gia đúng mã)
         socket.join(roomID);
         
-        console.log(`User [${userName}] (${socket.id}) đã vào phòng: ${roomID}`);
+        // Gửi thông báo thành công cho người gọi để họ chuyển màn hình
+        socket.emit('room-success', roomID);
 
-        // Thông báo cho những người cũ trong phòng biết có người mới vào để hiện tên
+        console.log(`✅ User [${userName}] đã vào phòng: ${roomID} | Action: ${action}`);
+
+        // Thông báo cho người cũ trong phòng biết có người mới
         socket.to(roomID).emit('user-joined', { 
             socketID: socket.id, 
             userName: userName 
         });
+    });
 
-        // A. TRUNG CHUYỂN TÍN HIỆU VIDEO (WebRTC Signaling)
-        socket.on('signal', (signalData) => {
-            // Gửi tín hiệu kèm tên người gửi để bên nhận hiển thị đúng nhãn video
-            socket.to(roomID).emit('signal', { 
-                ...signalData, 
-                fromName: userName 
-            });
-        });
+    // --- B. TÍN HIỆU VIDEO CALL (WebRTC) ---
+    // Chuyển tiếp các gói tin Offer, Answer, Candidate giữa các thiết bị
+    socket.on('signal', (signalData) => {
+        // Lấy room của socket hiện tại
+        const rooms = Array.from(socket.rooms);
+        const roomID = rooms.find(r => r !== socket.id); // RoomID không phải là socket.id
 
-        // B. ĐỒNG BỘ BẢNG TRẮNG (Nét vẽ)
-        socket.on('draw-line', (drawData) => {
-            socket.to(roomID).emit('draw-line', drawData);
-        });
+        if (roomID) {
+            socket.to(roomID).emit('signal', signalData);
+        }
+    });
 
-        // C. ĐỒNG BỘ BẢNG TRẮNG (Văn bản)
-        socket.on('draw-text', (drawData) => {
-            socket.to(roomID).emit('draw-text', drawData);
-        });
+    // --- C. ĐỒNG BỘ BẢNG TRẮNG ---
+    // 1. Vẽ nét
+    socket.on('draw-line', (drawData) => {
+        const rooms = Array.from(socket.rooms);
+        const roomID = rooms.find(r => r !== socket.id);
+        if (roomID) socket.to(roomID).emit('draw-line', drawData);
+    });
 
-        // D. XÓA BẢNG TRẮNG
-        socket.on('clear-board', () => {
-            socket.to(roomID).emit('clear-board');
-        });
+    // 2. Viết chữ
+    socket.on('draw-text', (drawData) => {
+        const rooms = Array.from(socket.rooms);
+        const roomID = rooms.find(r => r !== socket.id);
+        if (roomID) socket.to(roomID).emit('draw-text', drawData);
+    });
 
-        // Xử lý ngắt kết nối
-        socket.on('disconnect', () => {
-            console.log(`User [${userName}] đã rời phòng ${roomID}`);
+    // 3. Xóa bảng
+    socket.on('clear-board', () => {
+        const rooms = Array.from(socket.rooms);
+        const roomID = rooms.find(r => r !== socket.id);
+        if (roomID) socket.to(roomID).emit('clear-board');
+    });
+
+    // --- D. TÍNH NĂNG CHAT ---
+    socket.on('chat-message', (data) => {
+        const { roomID, userName, text } = data;
+        // Gửi tin nhắn cho những người khác trong phòng
+        socket.to(roomID).emit('chat-message', {
+            userName: userName,
+            text: text
         });
+    });
+
+    // --- E. NGẮT KẾT NỐI ---
+    socket.on('disconnect', () => {
+        console.log('❌ Một người dùng đã ngắt kết nối:', socket.id);
+        // Có thể thêm logic thông báo user đã rời phòng nếu cần
     });
 });
 
-// 3. Khởi chạy Server
+// 3. KHỞI CHẠY SERVER
 const PORT = 3000;
 http.listen(PORT, () => {
     console.log('==============================================');
-    console.log(`SERVER ĐANG CHẠY: http://localhost:${PORT}`);
-    console.log('Tính năng: Video P2P, Whiteboard, Tên người dùng');
+    console.log(`🚀 SERVER E4LIFE ĐANG CHẠY TẠI: http://localhost:${PORT}`);
+    console.log('   - Video Call P2P: Sẵn sàng');
+    console.log('   - Bảng trắng: Sẵn sàng');
+    console.log('   - Chat Realtime: Sẵn sàng');
     console.log('==============================================');
 });
