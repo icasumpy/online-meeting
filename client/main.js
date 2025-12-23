@@ -12,6 +12,8 @@ let participants = new Map(); // Map<socketID, {name, isLocal, joinTime}>
 let canvas, ctx;
 let currentRecipient = null; // Người nhận tin nhắn riêng
 let fileInput = null;
+let connectionAttempts = 0;
+const MAX_CONNECTION_ATTEMPTS = 3;
 
 // --- DOM ELEMENTS ---
 const contentWrapper = document.getElementById('content-wrapper');
@@ -46,12 +48,45 @@ document.getElementById('btnJoin').onclick = () => {
     requestJoin(id, 'join');
 };
 
-document.getElementById('btnCopy').onclick = () => {
+// document.getElementById('btnCopy').onclick = () => {
+//     if (!currentRoom) return;
+//     navigator.clipboard.writeText(currentRoom);
+//     alert("✅ Đã sao chép mã phòng!");
+// };
+document.getElementById('btnCopy').onclick = async () => {
     if (!currentRoom) return;
-    navigator.clipboard.writeText(currentRoom);
-    alert("✅ Đã sao chép mã phòng!");
+    
+    try {
+        await navigator.clipboard.writeText(currentRoom);
+        // Thay đổi icon tạm thời để báo hiệu thành công
+        const icon = document.querySelector('#btnCopy i');
+        const originalClass = icon.className;
+        icon.className = 'fa-solid fa-check';
+        
+        setTimeout(() => {
+            icon.className = originalClass;
+        }, 1000);
+    } catch (err) {
+        console.error('Lỗi sao chép:', err);
+        
+        // Fallback
+        const textArea = document.createElement('textarea');
+        textArea.value = currentRoom;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        
+        // Thay đổi icon tạm thời
+        const icon = document.querySelector('#btnCopy i');
+        const originalClass = icon.className;
+        icon.className = 'fa-solid fa-check';
+        
+        setTimeout(() => {
+            icon.className = originalClass;
+        }, 1000);
+    }
 };
-
 function requestJoin(id, actionType) {
     currentRoom = id;
     socket.emit('join-room', { roomID: id, userName: myName, action: actionType });
@@ -73,6 +108,7 @@ socket.on('room-success', (data) => {
     
     // 2. Reset danh sách
     participants.clear();
+    connectionAttempts = 0;
     
     // 3. Thêm chính mình vào danh sách
     addParticipantToList(socket.id, myName, true);
@@ -86,23 +122,30 @@ socket.on('room-success', (data) => {
         existingParticipants.forEach(p => {
             addParticipantToList(p.socketID, p.userName, false);
         });
+        
+        // Tạo kết nối WebRTC ngay lập tức
+        setTimeout(() => {
+            createPeerConnection();
+            if (peerConnection) {
+                initWebRTC();
+            }
+        }, 1000);
     } else {
         document.getElementById('remoteNameTag').innerText = 'Đang đợi người tham gia...';
+        // Chỉ khởi tạo camera khi chưa có ai trong phòng
+        initWebRTC();
     }
     
-    // 5. CHẠY CAMERA NGAY LẬP TỨC
-    initWebRTC(); 
-    
-    // 6. Khởi tạo Bảng trắng
+    // 5. Khởi tạo Bảng trắng
     initWhiteboard();
     
-    // 7. Thêm nút Export bảng
+    // 6. Thêm nút Export bảng
     addExportButton();
     
-    // 8. Thêm input file cho chat
+    // 7. Thêm input file cho chat
     addFileUploadButton();
     
-    // 9. Thông báo chat
+    // 8. Thông báo chat
     addMessageToUI("Hệ thống", `Bạn đã tham gia phòng ${roomID}`, 'system');
 });
 
@@ -121,55 +164,190 @@ socket.on('user-joined', async (data) => {
     // Thông báo chat
     addMessageToUI("Hệ thống", `${data.userName} đã tham gia phòng`, 'system');
     
+    // Tạo kết nối WebRTC với người mới
+    createPeerConnection();
+    
     // Tạo offer WebRTC
-    if (peerConnection) {
+    if (peerConnection && localStream) {
         try {
-            const offer = await peerConnection.createOffer();
+            // Chờ một chút để đảm bảo peer connection sẵn sàng
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            const offer = await peerConnection.createOffer({
+                offerToReceiveAudio: true,
+                offerToReceiveVideo: true
+            });
+            
             await peerConnection.setLocalDescription(offer);
+            
             socket.emit('signal', { 
                 offer, 
                 fromSocketID: socket.id, 
-                fromName: myName 
+                fromName: myName,
+                roomID: currentRoom
             });
+            
+            console.log("📡 Đã gửi WebRTC offer");
         } catch (error) {
             console.error("Lỗi khi tạo offer:", error);
+            // Thử lại nếu thất bại
+            if (connectionAttempts < MAX_CONNECTION_ATTEMPTS) {
+                connectionAttempts++;
+                setTimeout(() => {
+                    socket.emit('signal', { 
+                        offer, 
+                        fromSocketID: socket.id, 
+                        fromName: myName,
+                        roomID: currentRoom
+                    });
+                }, 1000 * connectionAttempts);
+            }
         }
     }
 });
 
+// --- TẠO PEER CONNECTION ---
+function createPeerConnection() {
+    if (peerConnection) {
+        peerConnection.close();
+    }
+    
+    // Cấu hình ICE servers cho mạng LAN/Wifi
+    const configuration = {
+        iceServers: [
+            // STUN servers (miễn phí) - quan trọng cho NAT traversal
+            { urls: 'stun:stun.l.google.com:19302' },
+            { urls: 'stun:stun1.l.google.com:19302' },
+            { urls: 'stun:stun2.l.google.com:19302' },
+            { urls: 'stun:stun3.l.google.com:19302' },
+            { urls: 'stun:stun4.l.google.com:19302' },
+            
+            // STUN server khác
+            { urls: 'stun:stun.stunprotocol.org:3478' },
+            
+            // Thêm TURN server miễn phí (nếu có thể)
+            // { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+            // { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+            // { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
+        ],
+        iceCandidatePoolSize: 10,
+        iceTransportPolicy: 'all',
+        bundlePolicy: 'max-bundle',
+        rtcpMuxPolicy: 'require'
+    };
+    
+    peerConnection = new RTCPeerConnection(configuration);
+    
+    // Xử lý remote track
+    peerConnection.ontrack = (event) => {
+        console.log("📹 Nhận được video từ người khác");
+        const remoteVideo = document.getElementById('remoteVideo');
+        if (remoteVideo.srcObject !== event.streams[0]) {
+            remoteVideo.srcObject = event.streams[0];
+            remoteVideo.play().catch(e => console.log("Lỗi play remote video:", e));
+        }
+    };
+    
+    // Xử lý ICE candidates
+    peerConnection.onicecandidate = (event) => {
+        if (event.candidate) {
+            socket.emit('signal', { 
+                candidate: event.candidate,
+                fromSocketID: socket.id,
+                fromName: myName,
+                roomID: currentRoom
+            });
+        }
+    };
+    
+    // Xử lý trạng thái kết nối
+    peerConnection.oniceconnectionstatechange = () => {
+        console.log("❄️ ICE Connection State:", peerConnection.iceConnectionState);
+        
+        switch(peerConnection.iceConnectionState) {
+            case 'connected':
+            case 'completed':
+                console.log("✅ WebRTC kết nối thành công!");
+                addMessageToUI("Hệ thống", "Kết nối video đã sẵn sàng", 'system');
+                break;
+            case 'disconnected':
+                console.log("⚠️ Kết nối bị gián đoạn, đang thử kết nối lại...");
+                break;
+            case 'failed':
+                console.log("❌ Kết nối thất bại");
+                addMessageToUI("Hệ thống", "Không thể kết nối video. Kiểm tra mạng và thử lại", 'system');
+                break;
+            case 'closed':
+                console.log("🔒 Kết nối đã đóng");
+                break;
+        }
+    };
+    
+    peerConnection.onconnectionstatechange = () => {
+        console.log("🔗 Connection State:", peerConnection.connectionState);
+    };
+    
+    peerConnection.onsignalingstatechange = () => {
+        console.log("📶 Signaling State:", peerConnection.signalingState);
+    };
+    
+    // Thêm local tracks nếu có
+    if (localStream) {
+        localStream.getTracks().forEach(track => {
+            peerConnection.addTrack(track, localStream);
+        });
+    }
+}
+
 // --- XỬ LÝ TÍN HIỆU WEBRTC ---
 socket.on('signal', async (data) => {
+    // Chỉ xử lý tín hiệu từ cùng phòng
+    if (data.roomID !== currentRoom) return;
+    
     // Cập nhật tên từ signal data nếu có
     if (data.fromName && data.fromSocketID) {
-        // Cập nhật hoặc thêm vào danh sách
         updateParticipantInList(data.fromSocketID, data.fromName);
     }
     
-    if (data.offer) {
-        try {
+    try {
+        if (data.offer) {
+            console.log("📥 Nhận được WebRTC offer từ", data.fromName);
+            
+            // Tạo peer connection nếu chưa có
+            if (!peerConnection) {
+                createPeerConnection();
+            }
+            
             await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
-            const ans = await peerConnection.createAnswer();
-            await peerConnection.setLocalDescription(ans);
+            
+            const answer = await peerConnection.createAnswer();
+            await peerConnection.setLocalDescription(answer);
+            
             socket.emit('signal', { 
-                answer: ans, 
+                answer: answer, 
                 fromSocketID: socket.id, 
-                fromName: myName 
+                fromName: myName,
+                roomID: currentRoom
             });
-        } catch (error) {
-            console.error("Lỗi khi xử lý offer:", error);
+            
+        } else if (data.answer) {
+            console.log("📥 Nhận được WebRTC answer từ", data.fromName);
+            
+            if (peerConnection && peerConnection.remoteDescription === null) {
+                await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+            }
+            
+        } else if (data.candidate) {
+            if (peerConnection && peerConnection.remoteDescription) {
+                try { 
+                    await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate)); 
+                } catch(e) {
+                    console.warn("Lỗi khi thêm ICE candidate:", e);
+                }
+            }
         }
-    } else if (data.answer) {
-        try {
-            await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
-        } catch (error) {
-            console.error("Lỗi khi xử lý answer:", error);
-        }
-    } else if (data.candidate) {
-        try { 
-            await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate)); 
-        } catch(e) {
-            console.warn("Lỗi khi thêm ICE candidate:", e);
-        }
+    } catch (error) {
+        console.error("Lỗi xử lý tín hiệu WebRTC:", error);
     }
 });
 
@@ -190,6 +368,12 @@ socket.on('user-left', (data) => {
     if (participants.size === 1) { // Chỉ còn mình
         document.getElementById('remoteVideo').srcObject = null;
         document.getElementById('remoteNameTag').innerText = 'Đang đợi người tham gia...';
+        
+        // Đóng peer connection
+        if (peerConnection) {
+            peerConnection.close();
+            peerConnection = null;
+        }
     }
     
     // Thông báo chat
@@ -803,61 +987,64 @@ function formatFileSize(bytes) {
 async function initWebRTC() {
     console.log("🎥 Đang khởi động Camera...");
     try {
+        // Kiểm tra quyền truy cập trước
+        const permissions = await navigator.permissions.query({ name: 'camera' });
+        console.log("Quyền camera:", permissions.state);
+        
         localStream = await navigator.mediaDevices.getUserMedia({ 
             video: { 
-                width: { ideal: 1280 },
-                height: { ideal: 720 } 
+                width: { ideal: 640, max: 1280 },
+                height: { ideal: 480, max: 720 },
+                frameRate: { ideal: 30, max: 60 },
+                facingMode: 'user'
             }, 
-            audio: true 
+            audio: {
+                echoCancellation: true,
+                noiseSuppression: true,
+                autoGainControl: true,
+                sampleRate: 44100,
+                channelCount: 2
+            }
         });
         
         document.getElementById('localVideo').srcObject = localStream;
         console.log("✅ Đã lấy được Camera thành công!");
+        
+        // Tự động play video
+        document.getElementById('localVideo').play().catch(e => console.log("Lỗi play local video:", e));
 
-        // Tạo Peer Connection
-        peerConnection = new RTCPeerConnection({ 
-            iceServers: [
-                { urls: 'stun:stun.l.google.com:19302' },
-                { urls: 'stun:stun1.l.google.com:19302' }
-            ] 
-        });
-
-        // Thêm track từ local stream
-        localStream.getTracks().forEach(track => {
-            peerConnection.addTrack(track, localStream);
-        });
-
-        // Xử lý remote track
-        peerConnection.ontrack = (event) => {
-            console.log("📹 Nhận được video từ người khác");
-            const remoteVideo = document.getElementById('remoteVideo');
-            if (remoteVideo.srcObject !== event.streams[0]) {
-                remoteVideo.srcObject = event.streams[0];
-            }
-        };
-
-        // Xử lý ICE candidates
-        peerConnection.onicecandidate = (event) => {
-            if (event.candidate) {
-                socket.emit('signal', { candidate: event.candidate });
-            }
-        };
-
-        // Xử lý trạng thái kết nối
-        peerConnection.onconnectionstatechange = () => {
-            console.log("🔗 Trạng thái kết nối:", peerConnection.connectionState);
-        };
-
+        // Tạo peer connection nếu chưa có
+        if (!peerConnection) {
+            createPeerConnection();
+        }
+        
+        // Thêm local tracks vào peer connection
+        if (peerConnection) {
+            localStream.getTracks().forEach(track => {
+                if (peerConnection.getSenders().find(s => s.track === track)) return;
+                peerConnection.addTrack(track, localStream);
+            });
+        }
+        
         setupMediaControls();
+        
+        // Kiểm tra ICE gathering
+        setTimeout(() => {
+            if (peerConnection) {
+                console.log("ICE Gathering State:", peerConnection.iceGatheringState);
+            }
+        }, 2000);
         
     } catch (error) {
         console.error("❌ Lỗi Camera:", error);
         if (error.name === 'NotAllowedError') {
-            alert("⚠️ Vui lòng CHO PHÉP quyền truy cập Camera và Microphone!");
+            alert("⚠️ Vui lòng CHO PHÉP quyền truy cập Camera và Microphone!\n\nTrình duyệt đã chặn quyền truy cập. Vui lòng:\n1. Nhấp vào biểu tượng ổ khóa trên thanh địa chỉ\n2. Chọn 'Cho phép' Camera và Micro\n3. Tải lại trang");
         } else if (error.name === 'NotFoundError') {
-            alert("❌ Không tìm thấy thiết bị camera/microphone!");
+            alert("❌ Không tìm thấy thiết bị camera/microphone!\n\nVui lòng kiểm tra:\n1. Camera/micro có được kết nối không\n2. Không có ứng dụng nào khác đang sử dụng camera\n3. Thử với trình duyệt khác");
+        } else if (error.name === 'NotReadableError') {
+            alert("❌ Không thể đọc từ thiết bị camera/micro!\n\nCó thể do:\n1. Driver camera bị lỗi\n2. Thiết bị đang bị chiếm dụng\n3. Thử khởi động lại trình duyệt");
         } else {
-            alert("Lỗi Camera: " + error.message);
+            alert("Lỗi Camera: " + error.message + "\n\nVui lòng thử với trình duyệt Chrome hoặc Edge mới nhất.");
         }
     }
 }
@@ -870,24 +1057,73 @@ function setupMediaControls() {
         if (!localStream) return;
         
         isMicOn = !isMicOn;
-        localStream.getAudioTracks()[0].enabled = isMicOn;
+        const audioTrack = localStream.getAudioTracks()[0];
+        if (audioTrack) {
+            audioTrack.enabled = isMicOn;
+        }
         btnMic.classList.toggle('red-state', !isMicOn);
         btnMic.innerHTML = isMicOn 
             ? '<i class="fa-solid fa-microphone"></i>' 
             : '<i class="fa-solid fa-microphone-slash"></i>';
+        
+        // Thông báo trạng thái
+        addMessageToUI("Hệ thống", `Microphone ${isMicOn ? 'bật' : 'tắt'}`, 'system');
     };
     
     btnCam.onclick = () => {
         if (!localStream) return;
         
         isCamOn = !isCamOn;
-        localStream.getVideoTracks()[0].enabled = isCamOn;
+        const videoTrack = localStream.getVideoTracks()[0];
+        if (videoTrack) {
+            videoTrack.enabled = isCamOn;
+        }
         btnCam.classList.toggle('red-state', !isCamOn);
         btnCam.innerHTML = isCamOn 
             ? '<i class="fa-solid fa-video"></i>' 
             : '<i class="fa-solid fa-video-slash"></i>';
+        
+        // Thông báo trạng thái
+        addMessageToUI("Hệ thống", `Camera ${isCamOn ? 'bật' : 'tắt'}`, 'system');
     };
 }
+
+// Hàm kiểm tra WebRTC support
+function checkWebRTCSupport() {
+    const requiredAPIs = [
+        'RTCPeerConnection',
+        'RTCSessionDescription',
+        'RTCIceCandidate',
+        'navigator.mediaDevices.getUserMedia'
+    ];
+    
+    for (const api of requiredAPIs) {
+        if (!window[api] && !navigator.mediaDevices?.getUserMedia) {
+            console.error(`❌ ${api} không được hỗ trợ`);
+            return false;
+        }
+    }
+    
+    console.log("✅ WebRTC được hỗ trợ đầy đủ");
+    return true;
+}
+
+// Kiểm tra khi trang load
+window.addEventListener('load', () => {
+    if (!checkWebRTCSupport()) {
+        alert("⚠️ Trình duyệt của bạn không hỗ trợ WebRTC hoặc đã lỗi thời.\n\nVui lòng sử dụng:\n- Google Chrome (bản mới nhất)\n- Microsoft Edge (bản mới nhất)\n- Firefox (bản mới nhất)\n\nSafari trên iOS/Mac cần bật WebRTC trong cài đặt.");
+    }
+    
+    // Test kết nối socket
+    socket.on('connect', () => {
+        console.log("✅ Kết nối Socket.IO thành công!");
+    });
+    
+    socket.on('connect_error', (err) => {
+        console.error("❌ Lỗi kết nối Socket.IO:", err.message);
+        alert("Không thể kết nối đến server. Vui lòng kiểm tra mạng và thử lại.");
+    });
+});
 
 // Xử lý khi đóng trang
 window.addEventListener('beforeunload', () => {
@@ -897,4 +1133,61 @@ window.addEventListener('beforeunload', () => {
     if (localStream) {
         localStream.getTracks().forEach(track => track.stop());
     }
+    
+    // Thông báo rời phòng
+    if (currentRoom) {
+        socket.emit('leave-room', { roomID: currentRoom });
+    }
+});
+
+// Hàm thử kết nối lại
+function reconnectWebRTC() {
+    if (connectionAttempts < MAX_CONNECTION_ATTEMPTS) {
+        connectionAttempts++;
+        console.log(`🔄 Thử kết nối lại WebRTC (lần ${connectionAttempts})...`);
+        
+        if (peerConnection) {
+            peerConnection.close();
+            peerConnection = null;
+        }
+        
+        setTimeout(() => {
+            createPeerConnection();
+            if (localStream && peerConnection) {
+                localStream.getTracks().forEach(track => {
+                    peerConnection.addTrack(track, localStream);
+                });
+            }
+        }, 1000 * connectionAttempts);
+    }
+}
+
+// --- THÊM NÚT KẾT NỐI LẠI ---
+function addReconnectButton() {
+    const bottomBar = document.querySelector('.bottom-bar');
+    if (!bottomBar) return;
+    
+    const reconnectBtn = document.createElement('button');
+    reconnectBtn.id = 'btnReconnect';
+    reconnectBtn.className = 'control-btn';
+    reconnectBtn.title = 'Kết nối lại video';
+    reconnectBtn.innerHTML = '<i class="fa-solid fa-rotate"></i>';
+    reconnectBtn.style.background = '#fbbc05';
+    reconnectBtn.style.color = '#202124';
+    
+    reconnectBtn.onclick = () => {
+        reconnectWebRTC();
+        addMessageToUI("Hệ thống", "Đang thử kết nối lại video...", 'system');
+    };
+    
+    // Chèn vào trước nút rời phòng
+    const hangupBtn = document.querySelector('.hangup-btn');
+    if (hangupBtn) {
+        bottomBar.querySelector('.center-controls').insertBefore(reconnectBtn, hangupBtn);
+    }
+}
+
+// Gọi hàm thêm nút reconnect khi vào phòng
+socket.on('room-success', () => {
+    setTimeout(addReconnectButton, 1000);
 });
