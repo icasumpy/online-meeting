@@ -39,14 +39,22 @@
         <div id="content-wrapper" class="content-wrapper">
             
             <div id="video-stage" class="video-stage">
+                <!-- Video từ xa -->
                 <div class="video-container">
                     <video id="remoteVideo" autoplay playsinline></video>
                     <div class="user-label remote-label" id="remoteNameTag">Đang đợi người tham gia...</div>
                 </div>
 
+                <!-- Video local -->
                 <div class="local-wrap">
                     <video id="localVideo" autoplay muted playsinline></video>
                     <div class="user-label" id="localNameTag">Bạn</div>
+                </div>
+
+                <!-- Share screen preview -->
+                <div class="screen-preview" id="screenPreview" style="display: none;">
+                    <video id="screenVideo" autoplay playsinline></video>
+                    <div class="user-label">Màn hình của bạn</div>
                 </div>
             </div>
 
@@ -108,6 +116,11 @@
             <div class="center-controls">
                 <button id="btnMic" class="control-btn"><i class="fa-solid fa-microphone"></i></button>
                 <button id="btnCam" class="control-btn"><i class="fa-solid fa-video"></i></button>
+                
+                <!-- Nút share screen mới -->
+                <button id="btnScreenShare" class="control-btn" title="Chia sẻ màn hình">
+                    <i class="fa-solid fa-display"></i>
+                </button>
                 
                 <button id="btnToggleBoard" class="control-btn"><i class="fa-solid fa-pen-to-square"></i></button>
                 

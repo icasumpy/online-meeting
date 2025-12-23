@@ -2,11 +2,13 @@ const socket = io();
 
 // --- BIẾN TOÀN CỤC ---
 let localStream, peerConnection, currentRoom;
+let screenStream = null; // Stream cho screen sharing
 let myName = ""; 
 let drawing = false;
 let mode = 'pen'; 
 let isMicOn = true;
 let isCamOn = true;
+let isScreenSharing = false;
 const myColor = '#' + Math.floor(Math.random() * 16777215).toString(16);
 let participants = new Map(); // Map<socketID, {name, isLocal, joinTime}>
 let canvas, ctx;
@@ -29,6 +31,9 @@ const participantsList = document.getElementById('participantsList');
 const btnSend = document.getElementById('btnSend');
 const chatInput = document.getElementById('chatInput');
 const messagesList = document.getElementById('chat-messages');
+const btnScreenShare = document.getElementById('btnScreenShare');
+const screenPreview = document.getElementById('screenPreview');
+const screenVideo = document.getElementById('screenVideo');
 
 // --- QUẢN LÝ PHÒNG ---
 document.getElementById('btnCreate').onclick = () => {
@@ -48,11 +53,7 @@ document.getElementById('btnJoin').onclick = () => {
     requestJoin(id, 'join');
 };
 
-// document.getElementById('btnCopy').onclick = () => {
-//     if (!currentRoom) return;
-//     navigator.clipboard.writeText(currentRoom);
-//     alert("✅ Đã sao chép mã phòng!");
-// };
+// Sao chép mã phòng với feedback tốt hơn
 document.getElementById('btnCopy').onclick = async () => {
     if (!currentRoom) return;
     
@@ -87,6 +88,7 @@ document.getElementById('btnCopy').onclick = async () => {
         }, 1000);
     }
 };
+
 function requestJoin(id, actionType) {
     currentRoom = id;
     socket.emit('join-room', { roomID: id, userName: myName, action: actionType });
@@ -168,7 +170,7 @@ socket.on('user-joined', async (data) => {
     createPeerConnection();
     
     // Tạo offer WebRTC
-    if (peerConnection && localStream) {
+    if (peerConnection && (localStream || screenStream)) {
         try {
             // Chờ một chút để đảm bảo peer connection sẵn sàng
             await new Promise(resolve => setTimeout(resolve, 500));
@@ -184,7 +186,8 @@ socket.on('user-joined', async (data) => {
                 offer, 
                 fromSocketID: socket.id, 
                 fromName: myName,
-                roomID: currentRoom
+                roomID: currentRoom,
+                isScreenSharing: isScreenSharing
             });
             
             console.log("📡 Đã gửi WebRTC offer");
@@ -198,7 +201,8 @@ socket.on('user-joined', async (data) => {
                         offer, 
                         fromSocketID: socket.id, 
                         fromName: myName,
-                        roomID: currentRoom
+                        roomID: currentRoom,
+                        isScreenSharing: isScreenSharing
                     });
                 }, 1000 * connectionAttempts);
             }
@@ -223,12 +227,7 @@ function createPeerConnection() {
             { urls: 'stun:stun4.l.google.com:19302' },
             
             // STUN server khác
-            { urls: 'stun:stun.stunprotocol.org:3478' },
-            
-            // Thêm TURN server miễn phí (nếu có thể)
-            // { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
-            // { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
-            // { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
+            { urls: 'stun:stun.stunprotocol.org:3478' }
         ],
         iceCandidatePoolSize: 10,
         iceTransportPolicy: 'all',
@@ -241,10 +240,20 @@ function createPeerConnection() {
     // Xử lý remote track
     peerConnection.ontrack = (event) => {
         console.log("📹 Nhận được video từ người khác");
+        
+        // Kiểm tra xem track có phải là screen sharing không
+        const isScreenTrack = event.streams[0]?.id.includes('screen') || 
+                             event.track.kind === 'video' && event.track.label.includes('screen');
+        
         const remoteVideo = document.getElementById('remoteVideo');
         if (remoteVideo.srcObject !== event.streams[0]) {
             remoteVideo.srcObject = event.streams[0];
             remoteVideo.play().catch(e => console.log("Lỗi play remote video:", e));
+            
+            // Cập nhật label nếu là screen sharing
+            if (isScreenTrack) {
+                document.getElementById('remoteNameTag').innerText = 'Đang chia sẻ màn hình...';
+            }
         }
     };
     
@@ -255,7 +264,8 @@ function createPeerConnection() {
                 candidate: event.candidate,
                 fromSocketID: socket.id,
                 fromName: myName,
-                roomID: currentRoom
+                roomID: currentRoom,
+                isScreenSharing: isScreenSharing
             });
         }
     };
@@ -297,6 +307,13 @@ function createPeerConnection() {
             peerConnection.addTrack(track, localStream);
         });
     }
+    
+    // Thêm screen track nếu đang share screen
+    if (screenStream) {
+        screenStream.getTracks().forEach(track => {
+            peerConnection.addTrack(track, screenStream);
+        });
+    }
 }
 
 // --- XỬ LÝ TÍN HIỆU WEBRTC ---
@@ -327,7 +344,8 @@ socket.on('signal', async (data) => {
                 answer: answer, 
                 fromSocketID: socket.id, 
                 fromName: myName,
-                roomID: currentRoom
+                roomID: currentRoom,
+                isScreenSharing: isScreenSharing
             });
             
         } else if (data.answer) {
@@ -983,6 +1001,92 @@ function formatFileSize(bytes) {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
+// --- SCREEN SHARING ---
+btnScreenShare.onclick = async () => {
+    try {
+        if (!isScreenSharing) {
+            // Bắt đầu chia sẻ màn hình
+            screenStream = await navigator.mediaDevices.getDisplayMedia({
+                video: {
+                    cursor: "always",
+                    displaySurface: "monitor"
+                },
+                audio: false
+            });
+            
+            // Hiển thị preview
+            screenVideo.srcObject = screenStream;
+            screenPreview.style.display = 'block';
+            
+            // Cập nhật UI
+            isScreenSharing = true;
+            btnScreenShare.classList.add('screen-share-active');
+            videoStage.classList.add('screen-shared');
+            
+            // Thêm screen track vào peer connection
+            if (peerConnection) {
+                screenStream.getTracks().forEach(track => {
+                    // Thay thế video track cũ bằng screen track
+                    const senders = peerConnection.getSenders();
+                    const videoSender = senders.find(s => s.track && s.track.kind === 'video');
+                    
+                    if (videoSender) {
+                        videoSender.replaceTrack(track);
+                    } else {
+                        peerConnection.addTrack(track, screenStream);
+                    }
+                });
+            }
+            
+            // Thông báo
+            addMessageToUI("Hệ thống", "Đã bắt đầu chia sẻ màn hình", 'system');
+            
+            // Xử lý khi người dùng dừng chia sẻ màn hình
+            screenStream.getVideoTracks()[0].onended = () => {
+                stopScreenSharing();
+            };
+            
+        } else {
+            // Dừng chia sẻ màn hình
+            stopScreenSharing();
+        }
+        
+    } catch (error) {
+        console.error("Lỗi khi chia sẻ màn hình:", error);
+        if (error.name === 'NotAllowedError') {
+            alert("Bạn đã từ chối chia sẻ màn hình.");
+        }
+    }
+};
+
+function stopScreenSharing() {
+    if (screenStream) {
+        screenStream.getTracks().forEach(track => track.stop());
+        screenStream = null;
+    }
+    
+    // Ẩn preview
+    screenPreview.style.display = 'none';
+    
+    // Cập nhật UI
+    isScreenSharing = false;
+    btnScreenShare.classList.remove('screen-share-active');
+    videoStage.classList.remove('screen-shared');
+    
+    // Khôi phục camera track
+    if (peerConnection && localStream) {
+        const senders = peerConnection.getSenders();
+        const videoSender = senders.find(s => s.track && s.track.kind === 'video');
+        
+        if (videoSender && localStream.getVideoTracks()[0]) {
+            videoSender.replaceTrack(localStream.getVideoTracks()[0]);
+        }
+    }
+    
+    // Thông báo
+    addMessageToUI("Hệ thống", "Đã dừng chia sẻ màn hình", 'system');
+}
+
 // --- CAMERA (WEBRTC) ---
 async function initWebRTC() {
     console.log("🎥 Đang khởi động Camera...");
@@ -1094,7 +1198,8 @@ function checkWebRTCSupport() {
         'RTCPeerConnection',
         'RTCSessionDescription',
         'RTCIceCandidate',
-        'navigator.mediaDevices.getUserMedia'
+        'navigator.mediaDevices.getUserMedia',
+        'navigator.mediaDevices.getDisplayMedia'
     ];
     
     for (const api of requiredAPIs) {
@@ -1132,6 +1237,9 @@ window.addEventListener('beforeunload', () => {
     }
     if (localStream) {
         localStream.getTracks().forEach(track => track.stop());
+    }
+    if (screenStream) {
+        screenStream.getTracks().forEach(track => track.stop());
     }
     
     // Thông báo rời phòng

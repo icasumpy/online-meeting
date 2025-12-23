@@ -210,6 +210,23 @@ body {
     background: rgba(138, 180, 248, 0.1);
 }
 
+.media-permission-hint {
+    margin-top: 20px;
+    font-size: 12px;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+}
+
+.media-permission-hint i {
+    color: var(--warning);
+}
+
 /* Connection status indicator */
 .connection-status {
     position: fixed;
@@ -225,6 +242,7 @@ body {
     gap: 6px;
     backdrop-filter: blur(10px);
     border: 1px solid rgba(255, 255, 255, 0.1);
+    transition: all 0.3s;
 }
 
 .connection-status.connected {
@@ -287,6 +305,7 @@ body {
     width: 100%; 
     height: 100%; 
     position: relative; 
+    overflow: hidden;
 }
 
 #remoteVideo {
@@ -295,6 +314,8 @@ body {
     object-fit: contain;
     background: #000;
     transition: opacity 0.3s;
+    position: relative;
+    z-index: 1;
 }
 
 .remote-label { 
@@ -309,6 +330,47 @@ body {
     backdrop-filter: blur(4px);
     border: 1px solid rgba(255, 255, 255, 0.1);
     z-index: 10;
+    max-width: 80%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Avatar khi tắt camera */
+.remote-avatar-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    z-index: 2;
+    animation: fadeIn 0.3s ease-out;
+}
+
+.remote-avatar {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 48px;
+    font-weight: bold;
+    border: 4px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    animation: pulseAvatar 2s infinite;
+}
+
+@keyframes pulseAvatar {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
 }
 
 /* Local Video (PIP - Picture in Picture) */
@@ -325,7 +387,6 @@ body {
     box-shadow: 0 4px 15px rgba(0,0,0,0.5);
     z-index: 10;
     transition: all 0.3s ease;
-    cursor: move;
 }
 
 #localVideo { 
@@ -333,6 +394,26 @@ body {
     height: 100%; 
     object-fit: cover; 
     transform: scaleX(-1); 
+    position: relative;
+    z-index: 1;
+}
+
+/* Avatar cho local video khi tắt camera */
+.local-avatar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 24px;
+    font-weight: bold;
+    z-index: 2;
+    border-radius: 12px;
 }
 
 .local-wrap .user-label {
@@ -344,6 +425,7 @@ body {
     padding: 2px 8px; 
     border-radius: 4px;
     backdrop-filter: blur(4px);
+    z-index: 3;
 }
 
 /* Khi Video Stage bị thu nhỏ */
@@ -352,29 +434,96 @@ body {
     height: 70px;
 }
 
-/* Video loading state */
-.video-loading {
+.video-stage.shrunk .local-avatar {
+    font-size: 16px;
+}
+
+/* Media Status Indicators */
+.media-status {
     position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    text-align: center;
-    color: var(--text-muted);
+    bottom: 10px;
+    right: 10px;
+    display: flex;
+    gap: 5px;
+    z-index: 10;
 }
 
-.video-loading .spinner {
-    width: 40px;
-    height: 40px;
-    border: 3px solid rgba(255, 255, 255, 0.1);
-    border-top: 3px solid var(--primary);
+.status-icon {
+    width: 24px;
+    height: 24px;
     border-radius: 50%;
-    animation: spin 1s linear infinite;
-    margin: 0 auto 10px;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 12px;
 }
 
-@keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+.status-icon.mic-off {
+    background: rgba(234, 67, 53, 0.8);
+}
+
+.status-icon.cam-off {
+    background: rgba(251, 188, 5, 0.8);
+}
+
+/* Connection Quality Indicator */
+.connection-quality {
+    position: absolute;
+    bottom: 10px;
+    left: 10px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    background: rgba(0, 0, 0, 0.6);
+    padding: 4px 8px;
+    border-radius: 4px;
+    z-index: 10;
+    font-size: 11px;
+    color: white;
+}
+
+.quality-indicator {
+    display: flex;
+    gap: 2px;
+    align-items: flex-end;
+}
+
+.quality-bar {
+    width: 3px;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 1px;
+    transition: all 0.3s;
+}
+
+.quality-bar.active {
+    background: var(--success);
+}
+
+.quality-bar:nth-child(1) { height: 4px; }
+.quality-bar:nth-child(2) { height: 6px; }
+.quality-bar:nth-child(3) { height: 8px; }
+.quality-bar:nth-child(4) { height: 10px; }
+.quality-bar:nth-child(5) { height: 12px; }
+
+/* Video Stats (debug) */
+.video-stats {
+    position: absolute;
+    bottom: 40px;
+    left: 10px;
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-family: monospace;
+    z-index: 10;
+    display: none;
+}
+
+.video-stats.show {
+    display: block;
 }
 
 /* --- 5. SIDE PANELS (CHAT & BOARD & PARTICIPANTS - BÊN PHẢI) --- */
@@ -474,6 +623,7 @@ body {
     line-height: 1.4;
     color: #000;
     animation: fadeInUp 0.3s ease-out;
+    word-wrap: break-word;
 }
 
 @keyframes fadeInUp {
@@ -603,29 +753,6 @@ body {
     transform: scale(1.1);
 }
 
-/* Tooltip cho file message */
-.file-message::after {
-    content: 'Click để tải xuống';
-    position: absolute;
-    bottom: -25px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: rgba(0, 0, 0, 0.8);
-    color: white;
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-size: 11px;
-    opacity: 0;
-    transition: opacity 0.2s;
-    pointer-events: none;
-    white-space: nowrap;
-    z-index: 1000;
-}
-
-.file-message:hover::after {
-    opacity: 1;
-}
-
 .chat-input-area {
     padding: 15px;
     background: #f8f9fa;
@@ -727,6 +854,7 @@ body {
     height: 100%;
     display: block;
     background: #ffffff;
+    touch-action: none;
 }
 
 .board-tools {
@@ -772,17 +900,42 @@ body {
     border-color: #d93025;
 }
 
-/* Nút Export */
-.tool-btn.export-btn {
-    background: #34a853;
-    color: white;
-    border-color: #34a853;
+/* Color Picker */
+.color-picker {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: white;
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+    z-index: 10000;
+    border: 1px solid #dadce0;
 }
 
-.tool-btn.export-btn:hover {
-    background: #2e8b47;
-    border-color: #2e8b47;
-    transform: translateY(-1px);
+.color-options {
+    display: flex;
+    gap: 10px;
+}
+
+.color-option {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: all 0.2s;
+}
+
+.color-option:hover {
+    transform: scale(1.2);
+    border-color: #333;
+}
+
+.color-option.selected {
+    border-color: #333;
+    transform: scale(1.1);
 }
 
 /* --- 8. DANH SÁCH NGƯỜI THAM GIA --- */
@@ -974,10 +1127,25 @@ body {
 }
 
 #currentTime {
-    margin-left: 20px;
     font-weight: 500;
     color: #bdc1c6;
     font-family: 'Monaco', 'Courier New', monospace;
+}
+
+.connection-info {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    background: rgba(255, 255, 255, 0.1);
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+
+.media-info {
+    font-size: 12px;
+    color: var(--text-muted);
+    display: flex;
+    gap: 10px;
 }
 
 .center-controls {
@@ -1017,9 +1185,25 @@ body {
     background: var(--danger);
 }
 
+.control-btn.red-state:hover {
+    background: #d93025;
+}
+
 .control-btn.warning-state {
     background: var(--warning);
     color: #202124;
+}
+
+.control-btn.warning-state:hover {
+    background: #e6a700;
+}
+
+.control-btn.success-state {
+    background: var(--success);
+}
+
+.control-btn.success-state:hover {
+    background: #2e8b47;
 }
 
 .hangup-btn {
@@ -1047,10 +1231,10 @@ body {
     background: var(--danger);
     border-radius: 50%;
     border: 2px solid #3c4043;
-    animation: pulse 1.5s infinite;
+    animation: pulseDot 1.5s infinite;
 }
 
-@keyframes pulse {
+@keyframes pulseDot {
     0% {
         transform: scale(0.9);
         box-shadow: 0 0 0 0 rgba(255, 107, 107, 0.7);
@@ -1083,6 +1267,8 @@ body {
     backdrop-filter: blur(10px);
     border: 1px solid rgba(255, 255, 255, 0.1);
     animation: slideUp 0.3s ease-out;
+    max-width: 90%;
+    text-align: center;
 }
 
 @keyframes slideUp {
@@ -1112,7 +1298,47 @@ body {
     border-left: 4px solid var(--primary);
 }
 
-/* --- 12. RESPONSIVE (MOBILE) --- */
+.toast i {
+    font-size: 16px;
+}
+
+/* --- 12. LOADING OVERLAY --- */
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    color: white;
+    gap: 20px;
+}
+
+.loading-overlay .spinner-large {
+    width: 60px;
+    height: 60px;
+    border: 4px solid rgba(255, 255, 255, 0.1);
+    border-top: 4px solid var(--primary);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.loading-text {
+    font-size: 16px;
+    font-weight: 500;
+}
+
+/* --- 13. RESPONSIVE (MOBILE) --- */
 @media (max-width: 768px) {
     .content-wrapper {
         flex-direction: column;
@@ -1150,12 +1376,19 @@ body {
         right: 10px;
     }
     
+    .remote-avatar {
+        width: 80px;
+        height: 80px;
+        font-size: 32px;
+    }
+    
     .bottom-bar {
         padding: 0 10px;
         height: 70px;
     }
     
-    .left-info, .right-placeholder {
+    .left-info .connection-info,
+    .right-placeholder {
         display: none;
     }
     
@@ -1190,10 +1423,6 @@ body {
         flex-wrap: wrap;
     }
     
-    .file-message::after {
-        display: none; /* Ẩn tooltip trên mobile */
-    }
-    
     .home-content {
         padding: 20px;
         margin: 20px;
@@ -1206,6 +1435,11 @@ body {
     .toast {
         width: 90%;
         text-align: center;
+    }
+    
+    .media-permission-hint {
+        font-size: 11px;
+        padding: 8px;
     }
 }
 
@@ -1230,9 +1464,16 @@ body {
         font-size: 12px;
         padding: 4px 8px;
     }
+    
+    .remote-label {
+        font-size: 11px;
+        padding: 6px 10px;
+        top: 10px;
+        left: 10px;
+    }
 }
 
-/* --- 13. SCROLLBAR TÙY CHỈNH --- */
+/* --- 14. SCROLLBAR TÙY CHỈNH --- */
 ::-webkit-scrollbar {
     width: 8px;
     height: 8px;
@@ -1269,7 +1510,7 @@ body {
     background: rgba(255, 255, 255, 0.3);
 }
 
-/* --- 14. UTILITY CLASSES --- */
+/* --- 15. UTILITY CLASSES --- */
 .hidden {
     display: none !important;
 }
@@ -1308,78 +1549,6 @@ body {
     }
 }
 
-/* Loading overlay */
-.loading-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.8);
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    z-index: 9999;
-    color: white;
-    gap: 20px;
-}
-
-.loading-overlay .spinner-large {
-    width: 60px;
-    height: 60px;
-    border: 4px solid rgba(255, 255, 255, 0.1);
-    border-top: 4px solid var(--primary);
-    border-radius: 50%;
-    animation: spin 1s linear infinite;
-}
-
-/* Connection quality indicator */
-.connection-quality {
-    position: absolute;
-    bottom: 10px;
-    right: 10px;
-    display: flex;
-    gap: 2px;
-    align-items: flex-end;
-    z-index: 10;
-}
-
-.quality-bar {
-    width: 4px;
-    background: rgba(255, 255, 255, 0.5);
-    border-radius: 1px;
-}
-
-.quality-bar.active {
-    background: var(--success);
-}
-
-.quality-bar:nth-child(1) { height: 6px; }
-.quality-bar:nth-child(2) { height: 9px; }
-.quality-bar:nth-child(3) { height: 12px; }
-.quality-bar:nth-child(4) { height: 15px; }
-.quality-bar:nth-child(5) { height: 18px; }
-
-/* Video stats overlay */
-.video-stats {
-    position: absolute;
-    bottom: 10px;
-    left: 10px;
-    background: rgba(0, 0, 0, 0.7);
-    color: white;
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-size: 10px;
-    font-family: monospace;
-    z-index: 10;
-    display: none;
-}
-
-.video-stats.show {
-    display: block;
-}
-
 /* Print styles */
 @media print {
     .bottom-bar,
@@ -1396,4 +1565,96 @@ body {
         background: white !important;
         border: 1px solid #ccc;
     }
-} 
+}
+/* --- Thêm vào cuối file style.css --- */
+
+/* Screen sharing styles */
+.screen-preview {
+    position: absolute;
+    bottom: 150px;
+    right: 20px;
+    width: 250px;
+    height: 160px;
+    background: #202124;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 2px solid rgba(255,255,255,0.2);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+    z-index: 10;
+    transition: all 0.3s ease;
+}
+
+.screen-preview video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.screen-preview .user-label {
+    position: absolute;
+    bottom: 5px;
+    left: 5px;
+    font-size: 11px;
+    background: rgba(0,0,0,0.6);
+    padding: 2px 8px;
+    border-radius: 4px;
+    backdrop-filter: blur(4px);
+}
+
+/* Screen sharing active state */
+.control-btn.screen-share-active {
+    background: #fbbc05;
+    color: #202124;
+    box-shadow: 0 0 0 3px rgba(251, 188, 5, 0.3);
+}
+
+.control-btn.screen-share-active:hover {
+    background: #e6a900;
+}
+
+/* Notification for screen sharing */
+.screen-sharing-notification {
+    position: absolute;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.screen-sharing-notification .fa-display {
+    color: #fbbc05;
+}
+
+/* Video stage when screen is shared */
+.video-stage.screen-shared .local-wrap {
+    width: 150px;
+    height: 90px;
+    bottom: 180px;
+}
+
+/* Mobile adjustments for screen sharing */
+@media (max-width: 768px) {
+    .screen-preview {
+        width: 120px;
+        height: 80px;
+        bottom: 100px;
+        right: 10px;
+    }
+    
+    .video-stage.screen-shared .local-wrap {
+        width: 80px;
+        height: 50px;
+        bottom: 110px;
+    }
+}

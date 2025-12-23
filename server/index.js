@@ -319,6 +319,7 @@ http.listen(PORT, () => {
     console.log('   - Bảng trắng: Sẵn sàng (có export)');
     console.log('   - Chat Realtime: Sẵn sàng (file + tin nhắn riêng)');
     console.log('   - Danh sách người tham gia: Sẵn sàng');
+    console.log('   - Share Screen: Sẵn sàng');
     console.log('==============================================');
     console.log('📱 Để kết nối từ thiết bị khác trong mạng LAN:');
     console.log(`   1. Mở trình duyệt trên thiết bị khác`);
